@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — Admin • Teams (One & Done)</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+    .team-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px; border:1px solid var(--border); border-radius:8px;
+      background:var(--panel); margin-bottom:8px;
+    }
+    .team-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .muted-small { color:var(--muted); font-size:.92rem; }
+  </style>
+</head>
+
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP" />
+      <h1>Admin • Teams (One &amp; Done)</h1>
+    </div>
+
+    <!-- Top-right nav: quiet gray pills -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+   <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Overview</a>    
+  <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>
+   
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:900px;">
+    <section class="card">
+      <div class="toolbar">
+        <input id="search" class="input" placeholder="Search team name..." style="min-width:260px" />
+        <span class="muted-small" id="count-line"></span>
+      </div>
+
+      <div id="team-list"></div>
+      <div id="empty" class="muted" hidden>No teams yet.</div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <script>
+    (async () => {
+      // Admin gate
+      try { if (typeof requireAdmin === 'function') await requireAdmin(); } catch (e) { console.error(e); }
+
+      // Robust logout
+      const lo = document.getElementById('logout-btn');
+      if (lo) {
+        lo.addEventListener('click', async () => {
+          try {
+            if (typeof doLogout === 'function') { await doLogout(); return; }
+          } catch (e) {
+            console.warn('doLogout failed; fallback', e);
+          }
+          window.location.href = '../index.html';
+        });
+      }
+
+      const pool = 'one-and-done';
+      let teams = [];
+
+      async function fetchTeams() {
+        const { data, error } = await sb
+          .from('teams')
+          .select('id, name, disabled, created_at, user_id')
+          .eq('pool_type', pool)
+          .order('created_at', { ascending: true });
+        if (error) {
+          console.warn(error.message);
+          return [];
+        }
+        return data || [];
+      }
+
+      function render(list) {
+        const holder = document.getElementById('team-list');
+        const empty  = document.getElementById('empty');
+        const count  = document.getElementById('count-line');
+
+        holder.innerHTML = '';
+
+        if (!list.length) {
+          empty.hidden = false;
+          count.textContent = '0 teams';
+          return;
+        }
+
+        empty.hidden = true;
+        count.textContent = `${list.length} team${list.length === 1 ? '' : 's'}`;
+
+        for (const t of list) {
+          const row = document.createElement('div');
+          row.className = 'team-row';
+
+          const left = document.createElement('div');
+          left.innerHTML = `<strong>${escapeHtml(t.name)}</strong><div class="muted-small">${escapeHtml(t.id)}</div>`;
+
+          const actions = document.createElement('div');
+          actions.className = 'team-actions';
+
+          // Rename (ghost blue)
+          const renameBtn = document.createElement('button');
+          renameBtn.className = 'btn btn--ghost btn--sm';
+          renameBtn.textContent = 'Rename';
+          renameBtn.addEventListener('click', async () => {
+            const nn = prompt('New team name', t.name);
+            if (!nn || nn.trim() === t.name) return;
+            const { error: e1 } = await sb.from('teams').update({ name: nn.trim() }).eq('id', t.id);
+            if (e1) { alert(e1.message); return; }
+            await load();
+          });
+
+          // Delete (ghost red)
+          const delBtn = document.createElement('button');
+          delBtn.className = 'btn btn--ghost-danger btn--sm';
+          delBtn.textContent = 'Delete';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm('Delete this team?')) return;
+            const { error: e2 } = await sb.from('teams').delete().eq('id', t.id);
+            if (e2) { alert(e2.message); return; }
+            await load();
+          });
+
+          actions.append(renameBtn, delBtn);
+          row.append(left, actions);
+          holder.appendChild(row);
+        }
+      }
+
+      function applySearch() {
+        const q = (document.getElementById('search').value || '').toLowerCase().trim();
+        if (!q) { render(teams); return; }
+        render(teams.filter(t => (t.name || '').toLowerCase().includes(q)));
+      }
+
+      async function load() {
+        teams = await fetchTeams();
+        applySearch();
+      }
+
+      document.getElementById('search').addEventListener('input', applySearch);
+
+      // Simple HTML escape
+      function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&','<':'<','>':'>','"':'"','\'':'\''}[c]));
+      }
+
+      await load();
+    })();
+  </script>
+</body>
+</html>

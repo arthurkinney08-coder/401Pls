@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — One & Done Survivor (Playoff)</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <!-- Shared pill button & tag system -->
+  <link rel="stylesheet" href="../styles/buttons.css" />
+</head>
+<body class="theme-dark">
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP Logo" />
+      <h1>One &amp; Done Survivor (Playoff)</h1>
+    </div>
+
+    <!-- All nav buttons: clear/quiet gray for consistency -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn--quiet btn--sm" href="./one-and-done-leaderboard.html">Leaderboard</a>
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Pool header -->
+    <section class="pool-header" style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
+      <div class="pool-title" style="display:flex; align-items:center; gap:10px;">
+        <!-- SPORT tag pill for visual consistency -->
+        <span class="tag tag--sport">FOOTBALL</span>
+        <h2 style="margin:0">One &amp; Done Survivor (Playoff)</h2>
+      </div>
+      <div id="lock-state" class="muted" style="min-height:22px;"></div>
+    </section>
+
+    <!-- Create team -->
+    <section class="card" id="create-card" style="margin-top:12px;">
+      <h3>Create a Team</h3>
+      <p class="muted">Team names must be unique in this pool.</p>
+
+      <form id="create-form" autocomplete="on" style="display:grid; gap:10px; max-width:520px;">
+        <label for="team-name">Team Name</label>
+        <input id="team-name" maxlength="60" required />
+        <!-- Clear/ghost per your “everything clear” direction -->
+        <button class="btn btn--ghost" type="submit">Create Team</button>
+      </form>
+
+      <p id="create-msg" class="muted" style="margin-top:8px;"></p>
+    </section>
+
+    <!-- Your teams -->
+    <section class="card" style="margin-top:16px;">
+      <h3>Your Teams</h3>
+      <div id="teams" class="team-list" style="display:grid; gap:10px;"></div>
+      <div id="teams-empty" class="muted" hidden>You have no teams yet.</div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <script>
+    (async () => {
+      await requireAuth();
+
+      const pool = 'one-and-done';
+
+      // Lock banner
+      const locked = await isPoolLocked(pool);
+      const lockEl = document.getElementById('lock-state');
+      lockEl.textContent = locked ? 'Pool is locked' : 'Pool is open';
+      if (locked) document.getElementById('create-card').style.display = 'none';
+
+      // Load & render teams
+      async function refresh(){
+        const teams = await fetchMyTeams(pool);
+        const list  = document.getElementById('teams');
+        const empty = document.getElementById('teams-empty');
+        list.innerHTML = '';
+
+        if (!teams.length) {
+          empty.hidden = false;
+          return;
+        } else {
+          empty.hidden = true;
+        }
+
+        for (const t of teams){
+          const row = document.createElement('div');
+          row.className = 'team-item';
+          row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px; border:1px solid #2a2d33; border-radius:10px;';
+
+          const label = document.createElement('div');
+          label.textContent = t.name + (t.disabled ? ' (disabled)' : '');
+
+          const actions = document.createElement('div');
+          actions.className = 'team-actions';
+          actions.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap;';
+
+          // Edit/Delete only when pool open
+          if (!locked){
+        const editBtn = document.createElement('button');
+editBtn.type = 'button';
+editBtn.className = 'btn btn--quiet btn--sm';   // now matches nav buttons
+editBtn.textContent = 'Edit';
+editBtn.onclick = async () => {
+  const nn = prompt('Rename team', t.name);
+  if (!nn) return;
+  try {
+    await renameTeam(t.id, nn, pool);
+    refresh();
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn btn--ghost-danger btn--sm'; // clear red
+            delBtn.textContent = 'Delete';
+            delBtn.onclick = async () => {
+              if (confirm('Delete this team?')) {
+                try {
+                  await deleteTeam(t.id);
+                  refresh();
+                } catch (err) {
+                  alert(err.message);
+                }
+              }
+            };
+
+            actions.append(editBtn, delBtn);
+          }
+
+          // Lineup link: clear blue
+          const lineupBtn = document.createElement('a');
+          lineupBtn.className = 'btn btn--ghost btn--sm';
+          lineupBtn.textContent = 'Lineup';
+
+          // Build URL that works with or without .html routing
+          const u = new URL('./one-and-done-lineup', window.location.href);
+          u.searchParams.set('team', t.id);
+          u.searchParams.set('teamName', t.name); // for header
+          lineupBtn.href = u.pathname + u.search;
+
+          actions.append(lineupBtn);
+          row.append(label, actions);
+          list.appendChild(row);
+        }
+      }
+
+      // Events
+      document.getElementById('logout-btn').addEventListener('click', doLogout);
+
+      const form = document.getElementById('create-form');
+      if (form){
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const name = document.getElementById('team-name').value.trim();
+          if (!name) return;
+          try{
+            await createTeam(pool, name);
+            document.getElementById('create-msg').textContent = 'Team "' + name + '" added!';
+            document.getElementById('team-name').value = '';
+            refresh();
+          }catch(err){
+            alert(err.message);
+          }
+        });
+      }
+
+      refresh();
+    })();
+  </script>
+</body>
+</html>

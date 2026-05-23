@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — One &amp; Done • Scoring Editor</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    /* ===== Compact layout so you don't have to scroll ===== */
+    :root {
+      --panel-pad: 10px;
+      --row-gap: 8px;
+      --field-gap: 8px;
+      --input-col-w: 130px;
+    }
+    .section-grid { display: grid; gap: var(--row-gap); }
+    @media (min-width: 1100px) { .section-grid { grid-template-columns: 1fr 1fr; } }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; padding: var(--panel-pad);
+    }
+    .panel h4 { margin: 0 0 6px 0; font-size: 1.02rem; }
+    .field-row {
+      display: grid; grid-template-columns: 1fr var(--input-col-w);
+      gap: var(--field-gap); align-items: center; margin-bottom: 6px;
+    }
+    .field-row:last-child { margin-bottom: 0; }
+    .field-row label { color: var(--muted); line-height: 1.2; }
+    .field-row .input { padding: 6px 8px; min-height: 30px; }
+    .btn-bar { display:flex; gap:10px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
+    .muted { margin: 4px 0 0 0; }
+  </style>
+</head>
+
+<body class="theme-dark">
+  <!-- Header: quiet gray nav buttons -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP" />
+      <h1>One &amp; Done • Scoring Editor</h1>
+    </div>
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Overview</a>
+      <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>
+    
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:1200px;">
+    <!-- Intro -->
+    <section class="card" style="padding: 12px;">
+      <h3 style="margin:0 0 6px 0;">Scoring Settings</h3>
+      <p class="muted">Edit fantasy scoring coefficients for One &amp; Done. Changes apply going forward.</p>
+    </section>
+
+    <!-- Scoring sections (compact panels) -->
+    <section class="section-grid">
+      <!-- QB / Offense -->
+      <div class="panel">
+        <h4>QB / Offense</h4>
+        <div class="field-row">
+          <label for="qb_pass_yd">QB Passing Yards (per yard)</label>
+          <input id="qb_pass_yd" type="number" step="0.01" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="qb_pass_td">QB Passing TD</label>
+          <input id="qb_pass_td" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="qb_int_thrown">Interception Thrown</label>
+          <input id="qb_int_thrown" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="qb_fum_lost">Fumble Lost</label>
+          <input id="qb_fum_lost" type="number" step="0.1" class="input" />
+        </div>
+      </div>
+
+      <!-- RB / WR / TE -->
+      <div class="panel">
+        <h4>RB / WR / TE</h4>
+        <div class="field-row">
+          <label for="rb_rush_yd">RB Rushing Yards (per yard)</label>
+          <input id="rb_rush_yd" type="number" step="0.01" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="rb_rush_td">RB Rushing TD</label>
+          <input id="rb_rush_td" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="wr_rec_yd">WR Receiving Yards (per yard)</label>
+          <input id="wr_rec_yd" type="number" step="0.01" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="wr_rec_td">WR Receiving TD</label>
+          <input id="wr_rec_td" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="te_rec_yd">TE Receiving Yards (per yard)</label>
+          <input id="te_rec_yd" type="number" step="0.01" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="te_rec_td">TE Receiving TD</label>
+          <input id="te_rec_td" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="ppr_rec">PPR (WR/RB/TE) — Per Reception</label>
+          <input id="ppr_rec" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="rb_int_thrown">RB Interception Thrown</label>
+          <input id="rb_int_thrown" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="rb_fum_lost">RB Fumble Lost</label>
+          <input id="rb_fum_lost" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="wr_int_thrown">WR Interception Thrown</label>
+          <input id="wr_int_thrown" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="wr_fum_lost">WR Fumble Lost</label>
+          <input id="wr_fum_lost" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="te_int_thrown">TE Interception Thrown</label>
+          <input id="te_int_thrown" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="te_fum_lost">TE Fumble Lost</label>
+          <input id="te_fum_lost" type="number" step="0.1" class="input" />
+        </div>
+      </div>
+
+      <!-- Kicker -->
+      <div class="panel">
+        <h4>Kicker</h4>
+        <div class="field-row">
+          <label for="k_pat">PAT Made</label>
+          <input id="k_pat" type="number" step="0.1" class="input" />
+        </div>
+        <div class="field-row">
+          <label for="k_fg_per_yard">Field Goal (per yard)</label>
+          <input id="k_fg_per_yard" type="number" step="0.01" class="input" />
+        </div>
+        <!-- Missed FG tiers -->
+        <div class="field-row"><label for="k_fg_miss_0_19">Missed FG 0–19</label><input id="k_fg_miss_0_19" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="k_fg_miss_20_29">Missed FG 20–29</label><input id="k_fg_miss_20_29" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="k_fg_miss_30_39">Missed FG 30–39</label><input id="k_fg_miss_30_39" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="k_fg_miss_40_49">Missed FG 40–49</label><input id="k_fg_miss_40_49" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="k_fg_miss_50_plus">Missed FG 50+</label><input id="k_fg_miss_50_plus" type="number" step="0.1" class="input" /></div>
+        <div class="field-row">
+          <label for="k_pat_miss">Missed PAT</label>
+          <input id="k_pat_miss" type="number" step="0.1" class="input" />
+        </div>
+      </div>
+
+      <!-- Defense/Special Teams -->
+      <div class="panel">
+        <h4>Defense / Special Teams</h4>
+        <div class="field-row"><label for="dst_sack">Sack</label><input id="dst_sack" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="dst_turnover">Turnover (INT/FUM)</label><input id="dst_turnover" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="dst_safety">Safety</label><input id="dst_safety" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="dst_td">Defense TD</label><input id="dst_td" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="st_td">Special Teams TD</label><input id="st_td" type="number" step="0.1" class="input" /></div>
+        <!-- Points Allowed tiers -->
+        <div class="field-row"><label for="pa_0">Points Allowed: 0</label><input id="pa_0" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="pa_1_6">Points Allowed: 1–6</label><input id="pa_1_6" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="pa_7_13">Points Allowed: 7–13</label><input id="pa_7_13" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="pa_14_20">Points Allowed: 14–20</label><input id="pa_14_20" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="pa_21_27">Points Allowed: 21–27</label><input id="pa_21_27" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="pa_28_34">Points Allowed: 28–34</label><input id="pa_28_34" type="number" step="0.1" class="input" /></div>
+        <div class="field-row"><label for="pa_35_plus">Points Allowed: 35+</label><input id="pa_35_plus" type="number" step="0.1" class="input" /></div>
+      </div>
+    </section>
+
+    <!-- ACTIONS -->
+    <section class="card" style="padding: 12px;">
+      <div class="btn-bar">
+        <button class="btn btn--ghost-danger btn--sm" id="reset-btn">Reset to Defaults</button>
+        <button class="btn btn--ghost btn--sm" id="save-btn">Save All</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <!-- Inline loader/saver so values always populate even if scoring.js is absent -->
+  <script>
+    (async () => {
+      // Admin gate + robust logout
+      try { if (typeof requireAdmin === 'function') await requireAdmin(); } catch(_) {}
+      document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        try { if (typeof doLogout === 'function') { await doLogout(); return; } } catch(e) {}
+        window.location.href = '../index.html';
+      });
+
+      // Map input IDs -> (category, stat). Kept same IDs you already used.
+      const MAP = {
+        // QB
+        qb_pass_yd:     ['qb','pass_yd'],
+        qb_pass_td:     ['qb','pass_td'],
+        qb_int_thrown:  ['qb','int_thrown'],
+        qb_fum_lost:    ['qb','fum_lost'],
+        // RB / WR / TE
+        rb_rush_yd:     ['rb','rush_yd'],
+        rb_rush_td:     ['rb','rush_td'],
+        wr_rec_yd:      ['wr','rec_yd'],
+        wr_rec_td:      ['wr','rec_td'],
+        te_rec_yd:      ['te','rec_yd'],
+        te_rec_td:      ['te','rec_td'],
+        ppr_rec:        ['wr','rec'],  // mirrored to rb/te on save
+        rb_int_thrown:  ['rb','int_thrown'],
+        rb_fum_lost:    ['rb','fum_lost'],
+        wr_int_thrown:  ['wr','int_thrown'],
+        wr_fum_lost:    ['wr','fum_lost'],
+        te_int_thrown:  ['te','int_thrown'],
+        te_fum_lost:    ['te','fum_lost'],
+        // Kicker
+        k_pat:          ['k','pat'],
+        k_fg_per_yard:  ['k','fg_per_yard'],
+        k_fg_miss_0_19: ['k','fg_miss_0_19'],
+        k_fg_miss_20_29:['k','fg_miss_20_29'],
+        k_fg_miss_30_39:['k','fg_miss_30_39'],
+        k_fg_miss_40_49:['k','fg_miss_40_49'],
+        k_fg_miss_50_plus:['k','fg_miss_50_plus'],
+        k_pat_miss:     ['k','pat_miss'],
+        // DST / ST
+        dst_sack:       ['dst','sack'],
+        dst_turnover:   ['dst','turnover'],
+        dst_safety:     ['dst','safety'],
+        dst_td:         ['dst','dst_td'],
+        st_td:          ['dst','st_td'],
+        // Points Allowed tiers
+        pa_0:           ['dst','pa_0'],
+        pa_1_6:         ['dst','pa_1_6'],
+        pa_7_13:        ['dst','pa_7_13'],
+        pa_14_20:       ['dst','pa_14_20'],
+        pa_21_27:       ['dst','pa_21_27'],
+        pa_28_34:       ['dst','pa_28_34'],
+        pa_35_plus:     ['dst','pa_35_plus'],
+      };
+
+      // Collect categories to fetch
+      const cats = Array.from(new Set(Object.values(MAP).map(([c]) => c)));
+
+      // Load existing values and populate inputs
+      try {
+        const { data, error } = await sb
+          .from('scoring_settings')
+          .select('category, stat, value')
+          .in('category', cats);
+        if (error) console.warn('load scoring_settings:', error);
+
+        const dict = {};
+        (data || []).forEach(r => { dict[`${r.category}.${r.stat}`] = r.value; });
+
+        for (const [id, [cat, stat]] of Object.entries(MAP)) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          const key = `${cat}.${stat}`;
+          if (Object.prototype.hasOwnProperty.call(dict, key)) {
+            el.value = dict[key]; // populate
+          }
+        }
+      } catch (e) {
+        console.warn('populate error:', e);
+      }
+
+      // Save handler (upsert each field; mirror PPR to rb/te)
+      async function upsert(category, stat, value) {
+        const v = Number(value);
+        const { error } = await sb
+          .from('scoring_settings')
+          .upsert([{ category, stat, value: Number.isFinite(v) ? v : 0 }], { onConflict: 'category,stat' });
+        if (error) throw error;
+      }
+
+      document.getElementById('save-btn')?.addEventListener('click', async () => {
+        try {
+          // Save everything currently in the form
+          for (const [id, [cat, stat]] of Object.entries(MAP)) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            await upsert(cat, stat, el.value || 0);
+          }
+          // Mirror PPR to RB & TE as well
+          const ppr = document.getElementById('ppr_rec')?.value || 0;
+          await upsert('rb','rec', ppr);
+          await upsert('te','rec', ppr);
+
+          alert('Scoring saved.');
+        } catch (e) {
+          alert(e?.message || 'Save failed');
+        }
+      });
+
+      // Reset clears inputs (you can re‑seed via SQL if needed)
+      document.getElementById('reset-btn')?.addEventListener('click', async () => {
+        if (!confirm('Reset scoring to defaults?')) return;
+        try {
+          Object.keys(MAP).forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+          alert('Cleared inputs. Re‑run your SQL seed to restore default values.');
+        } catch (e) {
+          alert(e?.message || 'Reset failed');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>DFP — One &amp; Done • Leaderboard</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png"/>
+  <link rel="stylesheet" href="../styles.css"/>
+  <link rel="stylesheet" href="../styles/buttons.css"/>
+
+  <style>
+    .header-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    /* ---- PNTS tokens ---- */
+    .pnts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .pnts-tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .token{
+      display:inline-flex;align-items:center;gap:6px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:.95rem;
+    }
+    .token .label{color:var(--muted)}
+    .token .value{font-weight:600}
+    .token.total-red{
+      background:rgba(220,53,69,0.15);
+      border-color:rgba(220,53,69,0.45);
+      color:#ffd7db;
+    }
+    /* ---- Award tokens (stacked preview) ---- */
+    .awards{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+    .token.vert{
+      border-radius:12px;
+      flex-direction:column;
+      align-items:flex-start;
+      padding:10px 12px;
+      min-width:140px;
+    }
+    .token.vert .label{font-size:.90rem}
+    .token.vert .value{font-size:1.15rem;letter-spacing:.01em}
+    .token.vert .unit{color:var(--muted);font-weight:600;letter-spacing:.02em;margin-left:4px}
+    .gold{
+      background:linear-gradient(180deg, rgba(201,162,39,0.22), rgba(201,162,39,0.10));
+      border-color:rgba(201,162,39,0.60);
+      color:#ffe9a8;
+    }
+    .silver{
+      background:linear-gradient(180deg, rgba(176,183,195,0.22), rgba(176,183,195,0.10));
+      border-color:rgba(176,183,195,0.55);
+      color:#e6ebf2;
+    }
+    .bronze{
+      background:linear-gradient(180deg, rgba(192,138,90,0.22), rgba(192,138,90,0.10));
+      border-color:rgba(192,138,90,0.55);
+      color:#ffdfc7;
+    }
+    /* ---- Leaderboard Table ---- */
+    .table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden; /* rounded zebra rows */
+    }
+    .table thead th {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 1; /* sticky header */
+      text-align:left;
+    }
+    .table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+    /* Remove highlight/hover/selection */
+    .table tbody tr:hover td { background: transparent !important; }
+    .table tbody tr:focus td { outline: none !important; }
+    .table tbody tr.is-selected td { background: transparent !important; box-shadow:none !important; }
+    .col-team { text-align: left; }
+    .col-points { text-align: right; font-variant-numeric: tabular-nums; }
+    .card h3.centered { text-align:center; margin-bottom:12px; }
+    .title-chip{
+      display:inline-block; padding:6px 12px; border-radius:999px;
+      background:rgba(45,108,223,0.16); border:1px solid rgba(45,108,223,0.45);
+      color:#cfe0ff; font-weight:600; font-size:1.0rem;
+    }
+    @media (max-width: 700px) {
+      .table thead th, .table tbody td { padding: 8px 10px; }
+      .token.vert{min-width:120px}
+    }
+    /* Expander */
+    .expander-btn {
+      width: 26px; height: 26px; border-radius: 6px;
+      display: grid; place-items: center; border: 1px solid #444;
+      background: #222; color: #ddd; cursor: pointer; line-height: 1; font-weight:700;
+    }
+    .expander-btn[aria-expanded="true"] { background:#2c2c2c; }
+    .detail-row td { background:#121212; padding:12px 16px; border-top:0; }
+    .round-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; }
+    .round-col { border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px; }
+    .round-title { font-weight: 700; font-size: 13px; color: #dfe3ea; margin: 0 0 8px 0; }
+    .player-row { display:flex; justify-content:space-between; gap:8px; border-bottom: 1px dashed #2a2a2a; padding:4px 0; }
+    .player-row:last-child { border-bottom: 0; }
+    .muted { color: #9aa9b2; }
+  </style>
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" alt="DFP" class="logo--small"/>
+      <h1>One &amp; Done • Leaderboard</h1>
+    </div>
+    <!-- NAV: all quiet/gray -->
+    <div class="actions header-actions">
+    <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Team Page</a>
+      <a class="btn btn--quiet btn--sm" href="./one-and-done-winners.html">Winners Circle</a>
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+  
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:1100px;">
+    <!-- Running PNTS -->
+    <section class="card">
+      <div class="pnts-row">
+        <div>
+          <h3 style="margin:0 0 6px 0;">Running PNTS</h3>
+          <div class="pnts-tokens" id="pnts-tokens"></div>
+        </div>
+        <div><span class="badge football">FOOTBALL</span></div>
+      </div>
+    </section>
+
+    <!-- Awards preview -->
+    <section class="card">
+      <h3 style="margin:0 0 6px 0;">Awards</h3>
+      <div class="awards">
+        <span class="token vert gold">
+          <span class="label">1st Award</span>
+          <span><span class="value" id="award-1st">—</span><span class="unit"> PNTS</span></span>
+        </span>
+        <span class="token vert silver">
+          <span class="label">2nd Award</span>
+          <span><span class="value" id="award-2nd">—</span><span class="unit"> PNTS</span></span>
+        </span>
+        <span class="token vert bronze">
+          <span class="label">3rd Award</span>
+          <span><span class="value" id="award-3rd">—</span><span class="unit"> PNTS</span></span>
+        </span>
+      </div>
+    </section>
+
+    <!-- Leaderboard -->
+    <section class="card">
+      <h3 class="centered" id="lb-title">Fantasy Points Leaderboard</h3>
+      <div id="lb-empty" class="muted" hidden>No teams yet.</div>
+      <div style="overflow-x:auto;">
+        <table class="table" id="lb">
+          <thead>
+            <tr>
+              <th style="width:42px;"></th>
+              <th class="col-team">Team</th>
+              <th class="col-points">Total Points</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <script>
+    (async () => {
+      const pool = 'one-and-done';
+      const lo = document.getElementById('logout-btn');
+      if (lo) lo.onclick = () => window.location.replace('/index.html');
+
+      try { if (typeof requireAuth === 'function') await requireAuth(); } catch(_) {}
+
+      const fmtInt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits:0 });
+      const fmtPts = (n) => Number(n ?? 0).toFixed(2);
+
+      function setAwards(total, p1, p2, p3){
+        const T = Number(total ?? 0);
+        const a1 = Math.floor(T * (Number(p1)/100));
+        const a2 = Math.floor(T * (Number(p2)/100));
+        const a3 = Math.max(0, T - a1 - a2);
+        const el1 = document.getElementById('award-1st');
+        const el2 = document.getElementById('award-2nd');
+        const el3 = document.getElementById('award-3rd');
+        if (el1) el1.textContent = fmtInt(a1);
+        if (el2) el2.textContent = fmtInt(a2);
+        if (el3) el3.textContent = fmtInt(a3);
+      }
+
+      function escapeHtml(s){
+        return (s ?? '').replace(/[&\<\>\\\"']/g, c => ({'&':'&','<':'<','>':'>','"':'"','\'':'\''}[c]));
+      }
+
+      // 1) Read is_final and prize split
+      let split = { p1:70, p2:25, p3:5 };
+      try {
+        const titleEl = document.getElementById('lb-title');
+        const { data: ps } = await sb
+          .from('pool_settings')
+          .select('is_final, prize_pct_1, prize_pct_2, prize_pct_3')
+          .eq('pool_type', pool)
+          .maybeSingle();
+        if (ps?.is_final) {
+          titleEl.innerHTML = `<span class="title-chip">Final Fantasy Points Leaderboard</span>`;
+        } else {
+          titleEl.textContent = 'Fantasy Points Leaderboard';
+        }
+        split = {
+          p1: Number(ps?.prize_pct_1 ?? 70),
+          p2: Number(ps?.prize_pct_2 ?? 25),
+          p3: Number(ps?.prize_pct_3 ?? 5),
+        };
+      } catch (e) {
+        console.warn('settings read error', e);
+      }
+
+      // 2) Running PNTS tokens
+      let entries=0, entryPNTS=0, totalPNTS=0;
+      try {
+        const { data: pr } = await sb
+          .from('v_pool_pnts_running')
+          .select('team_count, entry_pnts, running_pnts_total')
+          .eq('pool_type', pool)
+          .maybeSingle();
+        entries = pr?.team_count ?? 0;
+        entryPNTS = pr?.entry_pnts ?? 0;
+        totalPNTS = pr?.running_pnts_total ?? 0;
+        const tokens = document.getElementById('pnts-tokens');
+        if (tokens) {
+          tokens.innerHTML = `
+            <span class="token"><span class="label">Entries</span> <span class="value">${fmtInt(entries)}</span></span>
+            <span class="token"><span class="label">PNTS/Entry</span> <span class="value">${fmtInt(entryPNTS)}</span></span>
+            <span class="token total-red"><span class="label">Total PNTS</span> <span class="value">${fmtInt(totalPNTS)}</span></span>
+          `;
+        }
+      } catch (err) {
+        console.warn('pnts view load error', err);
+        const tokens = document.getElementById('pnts-tokens');
+        if (tokens) tokens.innerHTML = `<span class="token total-red"><span class="value">PNTS unavailable</span></span>`;
+      }
+
+      // Awards preview
+      setAwards(totalPNTS, split.p1, split.p2, split.p3);
+
+      /* ====== Four fixed rounds ====== */
+      const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl'];
+      const ROUND_SET = new Set(ROUND_ORDER);
+
+      /* ====== Fixed position order ====== */
+      const POS_ORDER = ['QB','RB','WR','TE','FLEX','K','DST'];
+      const POS_INDEX = Object.fromEntries(POS_ORDER.map((p, i) => [p, i]));
+
+      async function loadRosterPositions() {
+        const { data, error } = await sb
+          .from('roster_settings')
+          .select('position, quantity')
+          .order('position', { ascending: true });
+        if (error || !data) return [...POS_ORDER];
+        const norm = s => String(s || '').trim().toUpperCase();
+        const counts = new Map();
+        for (const row of data) {
+          const pos = norm(row.position);
+          const qty = Math.max(0, Number(row.quantity || 0));
+          if (POS_INDEX[pos] !== undefined && qty > 0) counts.set(pos, qty);
+        }
+        if (counts.size === 0) return [...POS_ORDER];
+        const placeholders = [];
+        for (const pos of POS_ORDER) {
+          const qty = counts.get(pos) || 0;
+          for (let i = 0; i < qty; i++) placeholders.push(pos);
+        }
+        return placeholders;
+      }
+
+      async function fetchTeamStartedByRound(teamId) {
+        const { data, error } = await sb
+          .from('v_od_team_lineups_started')
+          .select('window_label, players')
+          .eq('team_id', teamId);
+        if (error) {
+          console.warn('v_od_team_lineups_started error', error);
+          return {};
+        }
+        const map = {};
+        (data || []).forEach(r => {
+          const lbl = r.window_label || '';
+          if (!ROUND_SET.has(lbl)) return;
+          map[lbl] = r.players || [];
+        });
+        return map;
+      }
+
+      function renderDetailGrid(container, byRound, positionPlaceholders) {
+        container.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'round-grid';
+        ROUND_ORDER.forEach(lbl => {
+          const col = document.createElement('div');
+          col.className = 'round-col';
+          const h = document.createElement('h4');
+          h.className = 'round-title';
+          h.textContent = lbl;
+          col.appendChild(h);
+          const players = byRound[lbl] || [];
+          if (!players.length) {
+            positionPlaceholders.forEach(pos => {
+              const row = document.createElement('div');
+              row.className = 'player-row';
+              const left = document.createElement('div');
+              left.className = 'muted';
+              left.textContent = `${pos} — (no started selection)`;
+              row.append(left, document.createElement('div'));
+              col.appendChild(row);
+            });
+          } else {
+            const sorted = [...players].sort((a, b) => {
+              const A = String(a.position || '').toUpperCase();
+              const B = String(b.position || '').toUpperCase();
+              const ia = POS_INDEX[A] ?? 999, ib = POS_INDEX[B] ?? 999;
+              if (ia !== ib) return ia - ib;
+              return String(a.player_name || '').localeCompare(String(b.player_name || ''));
+            });
+            sorted.forEach(p => {
+              const row = document.createElement('div');
+              row.className = 'player-row';
+              const left = document.createElement('div');
+              const pos = String(p.position || '').toUpperCase();
+              const posLabel = pos ? `${pos} — ` : '';
+              left.textContent = `${posLabel}${p.player_name}${p.team_abbr ? ` · ${p.team_abbr}` : ''}`;
+              const right = document.createElement('div');
+              right.className = 'muted';
+              right.textContent = 'started';
+              row.append(left, right);
+              col.appendChild(row);
+            });
+          }
+          grid.appendChild(col);
+        });
+        container.appendChild(grid);
+      }
+
+      async function toggleDetail(mainTr, btn, team) {
+        const detailTr = mainTr.nextElementSibling;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        if (expanded) {
+          btn.setAttribute('aria-expanded', 'false');
+          btn.textContent = '+';
+          detailTr.hidden = true;
+          return;
+        }
+        btn.setAttribute('aria-expanded', 'true');
+        btn.textContent = '–';
+        detailTr.hidden = false;
+        const container = detailTr.querySelector('.detail-body');
+        container.innerHTML = '<div class="muted">Loading…</div>';
+        const byRound = await fetchTeamStartedByRound(team.team_id);
+        const positionPlaceholders = await loadRosterPositions();
+        renderDetailGrid(container, byRound, positionPlaceholders);
+      }
+
+      const { data: rows, error } = await sb
+        .from('v_od_leaderboard_visible_api')
+        .select('team_id, team_name, total_points')
+        .order('total_points', { ascending: false });
+      const tbody = document.querySelector('#lb tbody');
+      const empty = document.getElementById('lb-empty');
+
+      if (error || !rows || !rows.length) {
+        if (empty) empty.hidden = false;
+        return;
+      }
+      if (empty) empty.hidden = true;
+
+      tbody.innerHTML = '';
+      rows.forEach((r, i) => {
+        const tr = document.createElement('tr');
+        tr.tabIndex = 0;
+        tr.dataset.teamId = r.team_id || '';
+        const tdExp = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.className = 'expander-btn'; btn.type = 'button';
+        btn.setAttribute('aria-expanded', 'false'); btn.textContent = '+';
+        btn.addEventListener('click', () => toggleDetail(tr, btn, r));
+        tdExp.appendChild(btn);
+
+        const tdTeam = document.createElement('td');
+        tdTeam.className = 'col-team';
+        tdTeam.innerHTML = `<span class="muted" style="margin-right:8px">${i + 1}.</span> ${escapeHtml(r.team_name || 'Team')}`;
+
+        const tdPts = document.createElement('td');
+        tdPts.className = 'col-points';
+        tdPts.textContent = fmtPts(r.total_points);
+
+        tr.append(tdExp, tdTeam, tdPts);
+        tbody.appendChild(tr);
+
+        const dtr = document.createElement('tr');
+        dtr.className = 'detail-row'; dtr.hidden = true;
+        const dtd = document.createElement('td'); dtd.colSpan = 3;
+        dtd.innerHTML = `<div class="detail-body"></div>`;
+        dtr.appendChild(dtd);
+        tbody.appendChild(dtr);
+      });
+
+      // Simple keyboard helpers
+      let selected = null;
+      function clearSel(){ if(selected){ selected.classList.remove('is-selected'); selected=null; } }
+      function selectRow(tr){ if(selected===tr){ clearSel(); return; } clearSel(); selected=tr; selected.classList.add('is-selected'); }
+      function moveFocus(delta){
+        const focusable = Array.from(tbody.querySelectorAll('tr')).filter(tr => !tr.classList.contains('detail-row'));
+        const idx = focusable.indexOf(document.activeElement);
+        const next = Math.max(0, Math.min(focusable.length-1, idx + delta));
+        focusable[next]?.focus();
+      }
+      tbody.addEventListener('click', e => { const tr = e.target.closest('tr'); if (tr && !tr.classList.contains('detail-row')) selectRow(tr); });
+      tbody.addEventListener('keydown', e => {
+        if (e.key === 'Enter'){ const tr = document.activeElement.closest('tr'); if (tr && !tr.classList.contains('detail-row')){ selectRow(tr); e.preventDefault(); } }
+        else if (e.key === 'ArrowDown'){ moveFocus(1); e.preventDefault(); }
+        else if (e.key === 'ArrowUp'){ moveFocus(-1); e.preventDefault(); }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Teams</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    .btn.sm { padding: 6px 10px; font-size: 13px; }
+    .team-list { display: grid; gap: 10px; }
+  </style>
+</head>
+<body class="theme-dark">
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP" />
+      <h1>Teams</h1>
+    </div>
+
+    <!-- Cleaned up, quiet/gray nav -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <!-- Secondary admin menu removed -->
+
+  <main class="container" style="max-width:1100px;">
+    <section class="card">
+      <h3>Teams</h3>
+
+      <div style="display:grid;grid-template-columns:1fr 180px;gap:8px;margin-bottom:8px;">
+        <input id="team-search" placeholder="Search by team or user email" />
+
+        <select id="team-pool">
+          <option value="">All pools</option>
+          <option value="survivor">Survivor</option>
+          <option value="pick6">Pick 6</option>
+          <option value="one-and-done">One &amp; Done</option>
+          <option value="super-bowl">Super Bowl</option>
+          <option value="playoff-squares">Playoff Squares</option>
+          <option value="weekly-pickem">Weekly Pick'em</option>
+          <option value="stanley-cup">Stanley Cup</option>
+          <option value="cfp-bracket">CFP Bracket</option>
+          <option value="march-madness">March Madness</option>
+        </select>
+      </div>
+
+      <div id="team-list" class="team-list"></div>
+      <div id="team-empty" class="muted" hidden>No teams.</div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="./admin.js?v=7"></script>
+
+  <script>
+    (async () => {
+      // Admin gate
+      try {
+        if (typeof requireAdmin === 'function') {
+          await requireAdmin();
+        }
+      } catch (e) {
+        console.error("requireAdmin failed:", e);
+      }
+
+      // Robust logout
+      const btn = document.getElementById('logout-btn');
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          try {
+            if (typeof doLogout === 'function') {
+              await doLogout();
+              return;
+            }
+          } catch (e) {
+            console.warn("doLogout failed:", e);
+          }
+          window.location.href = "../index.html";
+        });
+      }
+
+      // Load teams
+      if (typeof renderTeams === 'function') {
+        await renderTeams();
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reset Password — DFP</title>
+  <link rel="icon" href="logo.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="theme-dark">
+  <header class="site-header center">
+    <img src="logo.png" alt="DFP Logo" class="logo" />
+    <h1>Reset your password</h1>
+  </header>
+  <main class="container">
+    <section class="card">
+      <form id="reset-form">
+        <label>New Password</label>
+        <input type="password" id="new-password" required />
+        <button type="submit" class="btn primary">Update Password</button>
+      </form>
+      <p id="reset-msg" class="msg"></p>
+    </section>
+  </main>
+  <footer class="site-footer center"><small>© Davisville Fantasy Pools</small></footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

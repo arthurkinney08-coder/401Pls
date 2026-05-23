@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Davisville Fantasy Pools — Sign In</title>
+  <link rel="icon" href="logo.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- NEW: unified button styles (add this file in step 2 below) -->
+  <link rel="stylesheet" href="styles/buttons.css" />
+</head>
+<body class="theme-dark">
+  <header class="site-header center">
+    <img src="logo.png" alt="DFP Logo" class="logo" />
+    <h1 class="brand">401 Fantasy Pools</h1>
+    <p class="muted">Log in or create an account to join a pool.</p>
+  </header>
+
+  <main class="auth-grid">
+    <!-- Login -->
+    <section class="card auth-card">
+      <h2>Log In</h2>
+      <form id="login-form" autocomplete="on">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" required />
+
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" required />
+
+       <!-- Log In button (use ghost to match your sample) -->
+<button type="submit" class="btn btn--ghost">Log In</button>
+
+<!-- Forgot password? (make legible on dark) -->
+<p class="note"><a class="link-muted" href="reset.html">Forgot password?</a></p>
+
+      </form>
+    </section>
+
+    <!-- Sign Up -->
+    <section class="card auth-card">
+      <h2>Sign Up</h2>
+      <form id="signup-form" autocomplete="on">
+        <label for="signup-email">Email</label>
+        <input type="email" id="signup-email" required />
+
+        <label for="signup-password">Password</label>
+        <input type="password" id="signup-password" required />
+
+        <!-- UPDATED: clear/ghost look (like your screenshot) -->
+        <button type="submit" class="btn btn--ghost">Create Account</button>
+
+        <!-- NEW: placeholder notice area we can update in JS -->
+        <p class="notice muted" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer center">
+    <small>© 2026 401 Fantasy Pools</small>
+  </footer>
+
+  <!-- Supabase + config + auth (kept as-is; safe to leave here) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

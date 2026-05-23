@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — One &amp; Done Winners</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png"/>
+  <link rel="stylesheet" href="../styles.css"/>
+  <link rel="stylesheet" href="../styles/buttons.css"/>
+
+  <style>
+    .header-actions{display:flex;gap:10px;flex-wrap:wrap}
+    /* ---------- HERO ---------- */
+    .hero{
+      margin:10px 0 12px 0; padding:18px 14px;
+      border:1px solid var(--border); border-radius:12px;
+      background:rgba(255,255,255,0.02); text-align:center;
+    }
+    .hero .logo{
+      display:block; margin:0 auto 10px auto; width:132px; height:auto;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+    }
+    .hero h1{ margin:4px 0 8px 0; font-size:1.45rem }
+    .hero p{ margin:6px 0; color:var(--muted) }
+    .hero .shout{ margin-top:10px }
+    /* ---------- TOKENS ---------- */
+    .tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .token{
+      display:inline-flex;align-items:center;gap:6px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:.95rem;
+    }
+    .token .label{color:var(--muted)}
+    .token .value{font-weight:600}
+    .token.total-red{
+      background:rgba(220,53,69,0.15);
+      border-color:rgba(220,53,69,0.45);
+      color:#ffd7db;
+    }
+    /* ---------- AWARD CHIPS ---------- */
+    .awards{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+    .award{
+      display:flex; flex-direction:column; gap:6px; min-width:160px;
+      border-radius:12px; padding:12px; border:1px solid var(--border);
+      background:rgba(255,255,255,0.04); text-align:left;
+    }
+    .award .label{font-size:.90rem; color:var(--muted)}
+    .award .value{font-weight:700; font-size:1.2rem; letter-spacing:.01em}
+    .gold{
+      background:linear-gradient(180deg, rgba(201,162,39,0.22), rgba(201,162,39,0.10));
+      border-color:rgba(201,162,39,0.60); color:#ffe9a8;
+    }
+    .silver{
+      background:linear-gradient(180deg, rgba(176,183,195,0.22), rgba(176,183,195,0.10));
+      border-color:rgba(176,183,195,0.55); color:#e6ebf2;
+    }
+    .bronze{
+      background:linear-gradient(180deg, rgba(192,138,90,0.22), rgba(192,138,90,0.10));
+      border-color:rgba(192,138,90,0.55); color:#ffdfc7;
+    }
+    /* ---------- TABLE ---------- */
+    .table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .table thead th {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 1;
+      text-align: left;
+    }
+    .table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+    .col-rank{ width:80px }
+    .col-team{ text-align:left }
+    .col-pts,.col-award{ text-align:right; font-variant-numeric: tabular-nums }
+    .summary{ margin-top:8px; color:var(--muted); font-size:.92rem }
+  </style>
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP"/>
+      <h1>One &amp; Done • Winners</h1>
+    </div>
+    <!-- NAV: all quiet/gray -->
+    <div class="actions header-actions">
+      <a class="btn btn--quiet btn--sm" href="./one-and-done-leaderboard.html">Leaderboard</a>
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:1100px;">
+    <!-- HERO -->
+    <section class="card hero" id="hero"></section>
+
+    <!-- PRIZE CONTEXT -->
+    <section class="card" id="context-card">
+      <h3 style="margin:0 0 6px 0;">Prize Context</h3>
+      <div class="tokens" id="context-tokens"></div>
+    </section>
+
+    <!-- AWARDS (Gold/Silver/Bronze) -->
+    <section class="card" id="awards-card">
+      <h3 style="margin:0 0 6px 0;">Awards</h3>
+      <div class="awards">
+        <div class="award gold">
+          <div class="label">1st Award</div>
+          <div><span class="value" id="award-1st">—</span> PNTS</div>
+        </div>
+        <div class="award silver">
+          <div class="label">2nd Award</div>
+          <div><span class="value" id="award-2nd">—</span> PNTS</div>
+        </div>
+        <div class="award bronze">
+          <div class="label">3rd Award</div>
+          <div><span class="value" id="award-3rd">—</span> PNTS</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- WINNERS TABLE -->
+    <section class="card" id="winners-card">
+      <h3 style="margin:0 0 6px 0;">Final Winners</h3>
+      <div id="lb-empty" class="muted" hidden>No teams yet.</div>
+      <div style="overflow-x:auto;">
+        <table class="table" id="winners">
+          <thead>
+            <tr>
+              <th class="col-rank">Place</th>
+              <th class="col-team">Team</th>
+              <th class="col-pts">Fantasy Points</th>
+              <th class="col-award">Award (PNTS)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="summary" id="summary-line"></div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <script>
+    (async () => {
+      const logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) logoutBtn.onclick = () => window.location.replace('/index.html');
+
+      const pool = 'one-and-done';
+      const fmtInt = (n)=> Number(n ?? 0).toLocaleString(undefined,{maximumFractionDigits:0});
+      const fmt2 = (n)=> Number(n ?? 0).toFixed(2);
+
+      const hero = document.getElementById('hero');
+      const contextCard = document.getElementById('context-card');
+      const awardsCard  = document.getElementById('awards-card');
+      const winnersCard = document.getElementById('winners-card');
+
+      // Read settings (need is_final + prize split)
+      let split = { p1:70, p2:25, p3:5 }, isFinal = false;
+      try {
+        const { data: ps } = await sb
+          .from('pool_settings')
+          .select('prize_pct_1, prize_pct_2, prize_pct_3, is_final')
+          .eq('pool_type', pool).maybeSingle();
+        if (ps) {
+          split.p1 = Number(ps.prize_pct_1 ?? 70);
+          split.p2 = Number(ps.prize_pct_2 ?? 25);
+          split.p3 = Number(ps.prize_pct_3 ?? 5);
+          isFinal = !!ps.is_final;
+        }
+      } catch (e) { console.warn('settings', e); }
+
+      // If NOT final: guard hero + hide sections
+      if (!isFinal) {
+        hero.innerHTML = `
+          <img src="../logo.png" class="logo" alt="DFP"/>
+          <h1 style="margin-top:6px">🔥 Winners Circle will unlock when results are final.</h1>
+          <p>A season of bold moves, ruthless matchups, and undeniable dominance is nearly complete.</p>
+          <p class="shout" style="opacity:.8">Check back soon — crowning the Champion is worth the wait.</p>
+        `;
+        contextCard.style.display = 'none';
+        awardsCard.style.display = 'none';
+        winnersCard.style.display = 'none';
+        return;
+      }
+
+      // Prize context
+      let entries=0, entryPNTS=0, totalPNTS=0;
+      try {
+        const { data: pr } = await sb
+          .from('v_pool_pnts_running')
+          .select('team_count, entry_pnts, running_pnts_total')
+          .eq('pool_type', pool).maybeSingle();
+        entries   = pr?.team_count ?? 0;
+        entryPNTS = pr?.entry_pnts ?? 0;
+        totalPNTS = pr?.running_pnts_total ?? 0;
+      } catch (e) { console.warn('pnts', e); }
+      document.getElementById('context-tokens').innerHTML = `
+        <span class="token"><span class="label">Entries</span> <span class="value">${fmtInt(entries)}</span></span>
+        <span class="token"><span class="label">PNTS/Entry</span> <span class="value">${fmtInt(entryPNTS)}</span></span>
+        <span class="token total-red"><span class="label">Total PNTS</span> <span class="value">${fmtInt(totalPNTS)}</span></span>
+      `;
+
+      // Buckets (remainder to 3rd)
+      const P1 = Math.floor(totalPNTS * (split.p1/100));
+      const P2 = Math.floor(totalPNTS * (split.p2/100));
+      const P3 = Math.max(0, totalPNTS - P1 - P2);
+      document.getElementById('award-1st').textContent = fmtInt(P1);
+      document.getElementById('award-2nd').textContent = fmtInt(P2);
+      document.getElementById('award-3rd').textContent = fmtInt(P3);
+
+      // Winners rows
+      const { data: rows, error } = await sb
+        .from('v_od_leaderboard')
+        .select('team_id, team_name, total_points')
+        .order('total_points', { ascending: false });
+      const tbody   = document.querySelector('#winners tbody');
+      const empty   = document.getElementById('lb-empty');
+      const summary = document.getElementById('summary-line');
+
+      if (error || !rows || !rows.length) {
+        empty.hidden = false;
+        summary.textContent = '';
+        hero.innerHTML = `
+          <img src="../logo.png" class="logo" alt="DFP"/>
+          <h1>🔥 Winners will appear once standings are available.</h1>
+          <p>Stay tuned.</p>`;
+        return;
+      }
+
+      // Tie groups
+      const groups = [];
+      let i = 0;
+      while (i < rows.length) {
+        const pts = rows[i].total_points;
+        const g = [];
+        let j = i;
+        while (j < rows.length && rows[j].total_points === pts) { g.push(rows[j]); j++; }
+        groups.push(g);
+        i = j;
+      }
+
+      const buckets = [P1,P2,P3];
+      let placeIdx = 0;
+      const result = [];
+      for (const g of groups) {
+        const m = g.length;
+        const start = placeIdx;
+        const end = Math.min(2, start + m - 1);
+        if (start > 2) {
+          for (const t of g) result.push({ placeLabel: `${start+1}${ord(start+1)}`, team: t.team_name, pts: t.total_points, award: 0 });
+          continue;
+        }
+        let pooled = 0;
+        for (let k = start; k <= end; k++) pooled += (buckets[k] || 0);
+        const each = Math.floor(pooled / m);
+        for (const t of g) {
+          const placeNum = start + 1;
+          result.push({ placeLabel: `${placeNum}${ord(placeNum)}`, team: t.team_name, pts: t.total_points, award: each });
+        }
+        placeIdx = end + 1;
+        if (placeIdx > 2) break;
+      }
+
+      const champions = result.filter(r => r.placeLabel.startsWith('1'));
+      const seconds   = result.filter(r => r.placeLabel.startsWith('2'));
+      const thirds    = result.filter(r => r.placeLabel.startsWith('3'));
+      const names = (arr) => arr.map(x => `<strong>${escapeHtml(x.team)}</strong>`).join(', ');
+      const champLine = champions.length === 1
+        ? `🔥 Your 401 Fantasy Pools Champion has arrived ${names(champions)} — bow down to the throne.`
+        : `🔥 Your 401 Fantasy Pools Champions have arrived ${names(champions)} — bow down to the throne.`;
+      const shout2 = seconds.length ? `🥈 Second place ${names(seconds)} showed grit all season long.` : '';
+      const shout3 = thirds.length  ? `🥉 Third place ${names(thirds)} held strong and earned their spot on the podium.` : '';
+      hero.innerHTML = `
+        <img src="../logo.png" class="logo" alt="DFP"/>
+        <h1>${champLine}</h1>
+        <p>A season of bold moves, ruthless matchups, and undeniable dominance has crowned its ruler.</p>
+        ${shout2 ? `<p class="shout">${shout2}</p>` : ''}
+        ${shout3 ? `<p class="shout">${shout3}</p>` : ''}
+      `;
+
+      tbody.innerHTML = '';
+      for (const r of result) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="col-rank">${r.placeLabel}</td>
+          <td class="col-team">${escapeHtml(r.team)}</td>
+          <td class="col-pts">${fmt2(r.pts)}</td>
+          <td class="col-award">${fmtInt(r.award)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      const totalAwarded = result.reduce((a,b)=> a + (b.award || 0), 0);
+      const remainder = Math.max(0, (P1+P2+P3) - totalAwarded);
+      summary.textContent = `Awarded PNTS: ${fmtInt(totalAwarded)} of ${fmtInt(P1+P2+P3)} total ${remainder ? `(remainder ${fmtInt(remainder)} kept for rounding or unused buckets)` : ''}.`;
+
+      function ord(n){
+        const v = n % 100; if (v>=11 && v<=13) return 'th';
+        switch(n % 10){ case 1:return 'st'; case 2:return 'nd'; case 3:return 'rd'; default:return 'th'; }
+      }
+      function escapeHtml(s){
+        return (s ?? '').replace(/[&\<\>\"']/g, c => ({'&':'&','<':'<','>':'>','"':'"','\'':'\''}[c]));
+      }
+    })();
+  </script>
+</body>
+</html>

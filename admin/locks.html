@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Locks</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    /* Page-local tweaks (keep it minimal) */
+    .btn.sm { padding: 6px 10px; font-size: 13px; }
+  </style>
+</head>
+
+<body class="theme-dark">
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" alt="DFP" class="logo--small" />
+      <h1>Locks</h1>
+    </div>
+
+    <!-- NAV: quiet gray pills, consistent everywhere -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <!-- Secondary admin menu removed by request -->
+
+  <main class="container" style="max-width:1100px;">
+    <section class="card">
+      <h3>Pool Locks</h3>
+      <div id="locks"></div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="./admin.js?v=7"></script>
+
+  <script>
+    (async () => {
+      // Require admin; your helper will redirect/throw if not authorized
+      try {
+        if (typeof requireAdmin === 'function') {
+          await requireAdmin();
+        }
+      } catch (e) {
+        console.error('requireAdmin failed:', e);
+      }
+
+      // Robust logout: prefer doLogout, fallback to index
+      const btn = document.getElementById('logout-btn');
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          try {
+            if (typeof doLogout === 'function') {
+              await doLogout();
+              return;
+            }
+          } catch (e) {
+            console.warn('doLogout failed; fallback redirecting', e);
+          }
+          window.location.href = '../index.html';
+        });
+      }
+
+      // Render locks UI if provided by admin.js
+      if (typeof renderPoolLocks === 'function') {
+        await renderPoolLocks();
+      }
+    })();
+  </script>
+</body>
+</html>

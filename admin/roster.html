@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — One & Done • Roster Editor</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    .grid { display:grid; gap:20px; }
+    @media (min-width:900px) { .grid { grid-template-columns:1fr 1fr; } }
+    .input-row { margin-bottom:10px; }
+    .input-row label { display:block; margin-bottom:4px; }
+    .small-muted { color: var(--muted); font-size: .92rem; }
+    .big-buttons {
+      display:flex;
+      gap:12px;
+      justify-content:flex-end;
+      margin-top:16px;
+      flex-wrap:wrap;
+    }
+    .ok  { color:#9bbcff; }
+    .err { color:#ff7474; }
+  </style>
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" alt="DFP" class="logo--small" />
+      <h1>One & Done • Roster Editor</h1>
+    </div>
+    <!-- Top-right nav: quiet gray pills -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Overview</a>
+      <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>
+    
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:1100px;">
+    <section class="card">
+      <h3>Lineup Slots</h3>
+      <p class="small-muted">
+        Set how many slots each position has. FLEX can allow RB / WR / TE.
+        These settings drive the picks UI on the One &amp; Done lineup page.
+      </p>
+
+      <div class="grid">
+        <!-- Positions -->
+        <div class="card">
+          <div class="input-row">
+            <label for="qb">QB</label>
+            <input id="qb" type="number" class="input" min="0" step="1" placeholder="1" />
+          </div>
+          <div class="input-row">
+            <label for="rb">RB</label>
+            <input id="rb" type="number" class="input" min="0" step="1" placeholder="2" />
+          </div>
+          <div class="input-row">
+            <label for="wr">WR</label>
+            <input id="wr" type="number" class="input" min="0" step="1" placeholder="2" />
+          </div>
+          <div class="input-row">
+            <label for="te">TE</label>
+            <input id="te" type="number" class="input" min="0" step="1" placeholder="1" />
+          </div>
+          <div class="input-row">
+            <label for="k">K</label>
+            <input id="k" type="number" class="input" min="0" step="1" placeholder="1" />
+          </div>
+          <div class="input-row">
+            <label for="dst">DST</label>
+            <input id="dst" type="number" class="input" min="0" step="1" placeholder="1" />
+          </div>
+        </div>
+
+        <!-- FLEX -->
+        <div class="card">
+          <h4>FLEX Slot</h4>
+          <div class="input-row">
+            <label for="flex_qty">FLEX Count</label>
+            <input id="flex_qty" type="number" class="input" min="0" step="1" placeholder="1" />
+          </div>
+          <div class="input-row">
+            <label>Allowed Positions</label>
+            <label><input type="checkbox" class="flex-allow" value="RB" /> RB</label>
+            <label><input type="checkbox" class="flex-allow" value="WR" /> WR</label>
+            <label><input type="checkbox" class="flex-allow" value="TE" /> TE</label>
+          </div>
+          <p class="small-muted">
+            Tip: The picks screen will allow multi‑select automatically when a
+            position has a quantity greater than 1 (e.g., RB ×2, WR ×2).
+          </p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="big-buttons">
+        <button class="btn btn--ghost btn--sm" id="defaults-btn">Fill NFL Defaults</button>
+        <button class="btn btn--ghost-danger btn--sm" id="reset-btn">Clear UI</button>
+        <button class="btn btn--ghost btn--sm" id="save-btn">Save All</button>
+      </div>
+
+      <p id="msg" class="small-muted"></p>
+    </section>
+  </main>
+
+  <!-- External scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <!-- Page logic (unchanged except for logout robustness) -->
+  <script>
+    (async () => {
+      try { if (typeof requireAdmin === 'function') await requireAdmin(); } catch(e) { console.error(e); }
+
+      // Robust logout (helper or fallback)
+      const lo = document.getElementById("logout-btn");
+      if (lo) {
+        lo.addEventListener('click', async () => {
+          try {
+            if (typeof doLogout === 'function') { await doLogout(); return; }
+          } catch (e) {
+            console.warn('doLogout failed; fallback', e);
+          }
+          window.location.href = '../index.html';
+        });
+      }
+
+      // Defaults used when table is empty or when the user clicks "Fill NFL Defaults"
+      const DEFAULTS = {
+        QB: 1,
+        RB: 2,
+        WR: 2,
+        TE: 1,
+        FLEX: { qty: 1, allowed: ['RB','WR','TE'] },
+        K: 1,
+        DST: 1
+      };
+      const POS = ['QB','RB','WR','TE','FLEX','K','DST'];
+      const msg = document.getElementById('msg');
+
+      // --- UI helpers
+      function setUI(values) {
+        document.getElementById('qb').value  = values.QB ?? 0;
+        document.getElementById('rb').value  = values.RB ?? 0;
+        document.getElementById('wr').value  = values.WR ?? 0;
+        document.getElementById('te').value  = values.TE ?? 0;
+        document.getElementById('k').value   = values.K  ?? 0;
+        document.getElementById('dst').value = values.DST ?? 0;
+        // FLEX
+        document.getElementById('flex_qty').value = values.FLEX?.qty ?? 0;
+        const allowed = values.FLEX?.allowed ?? [];
+        document.querySelectorAll('.flex-allow').forEach(cb => {
+          cb.checked = allowed.includes(cb.value);
+        });
+      }
+
+      function readUI() {
+        const toInt = (id) => {
+          const n = parseInt(document.getElementById(id).value, 10);
+          return Number.isFinite(n) && n >= 0 ? n : 0;
+        };
+        const allowed = Array
+          .from(document.querySelectorAll('.flex-allow:checked'))
+          .map(x => x.value);
+        return {
+          QB: toInt('qb'),
+          RB: toInt('rb'),
+          WR: toInt('wr'),
+          TE: toInt('te'),
+          K:  toInt('k'),
+          DST:toInt('dst'),
+          FLEX: { qty: toInt('flex_qty'), allowed }
+        };
+      }
+
+      function showMsg(text, ok = true) {
+        msg.textContent = text;
+        msg.className = 'small-muted ' + (ok ? 'ok' : 'err');
+        if (ok) setTimeout(() => { msg.textContent = ''; }, 1200);
+      }
+
+      // --- Load current roster_settings
+      async function loadCurrent() {
+        const { data, error } = await sb
+          .from('roster_settings')
+          .select('position, quantity, is_flex, allowed_positions');
+        if (error) {
+          showMsg(error.message, false);
+          return;
+        }
+        if (!data || data.length === 0) {
+          // Nothing in DB -> default the UI
+          setUI(DEFAULTS);
+          showMsg('No rows found; showing NFL defaults (not saved yet).');
+          return;
+        }
+        const byPos = {};
+        data.forEach(r => { byPos[r.position] = r; });
+        setUI({
+          QB:  byPos['QB'] ?.quantity ?? DEFAULTS.QB,
+          RB:  byPos['RB'] ?.quantity ?? DEFAULTS.RB,
+          WR:  byPos['WR'] ?.quantity ?? DEFAULTS.WR,
+          TE:  byPos['TE'] ?.quantity ?? DEFAULTS.TE,
+          K:   byPos['K']  ?.quantity ?? DEFAULTS.K,
+          DST: byPos['DST']?.quantity ?? DEFAULTS.DST,
+          FLEX: {
+            qty:     byPos['FLEX']?.quantity ?? DEFAULTS.FLEX.qty,
+            allowed: byPos['FLEX']?.allowed_positions ?? DEFAULTS.FLEX.allowed
+          }
+        });
+      }
+
+      // --- Save (robust: delete + insert fresh)
+      async function saveAll() {
+        try {
+          const v = readUI();
+          // Basic validation
+          const nums = [v.QB, v.RB, v.WR, v.TE, v.K, v.DST, v.FLEX.qty];
+          const allNonNeg = nums.every(n => Number.isFinite(n) && n >= 0);
+          if (!allNonNeg) {
+            showMsg('All slot counts must be 0 or higher.', false);
+            return;
+          }
+          const rows = [
+            { position: 'QB',   quantity: v.QB,   is_flex: false, allowed_positions: null },
+            { position: 'RB',   quantity: v.RB,   is_flex: false, allowed_positions: null },
+            { position: 'WR',   quantity: v.WR,   is_flex: false, allowed_positions: null },
+            { position: 'TE',   quantity: v.TE,   is_flex: false, allowed_positions: null },
+            { position: 'K',    quantity: v.K,    is_flex: false, allowed_positions: null },
+            { position: 'DST',  quantity: v.DST,  is_flex: false, allowed_positions: null },
+            { position: 'FLEX', quantity: v.FLEX.qty, is_flex: true, allowed_positions: v.FLEX.allowed }
+          ];
+          // Delete these positions, then insert fresh
+          const { error: delErr } = await sb
+            .from('roster_settings')
+            .delete()
+            .in('position', POS);
+          if (delErr) throw delErr;
+
+          const { error: insErr } = await sb
+            .from('roster_settings')
+            .insert(rows);
+          if (insErr) throw insErr;
+
+          showMsg('Saved.', true);
+        } catch (e) {
+          showMsg(e.message || 'Save failed', false);
+        }
+      }
+
+      // --- Wire buttons
+      document.getElementById('defaults-btn').onclick = () => {
+        setUI(DEFAULTS);
+        showMsg('Defaults filled (not saved yet).');
+      };
+      document.getElementById('reset-btn').onclick = () => {
+        setUI({ QB:0, RB:0, WR:0, TE:0, K:0, DST:0, FLEX:{ qty:0, allowed:[] } });
+        showMsg('Cleared UI (not saved).');
+      };
+      document.getElementById('save-btn').onclick = saveAll;
+
+      // First load
+      await loadCurrent();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Players</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    :root{
+      --pad-card:12px;
+      --gap:10px;
+      --row-gap:8px;
+      --input-min-h:30px;
+    }
+    .grid { display:grid; gap: var(--gap); }
+    .grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .row { display:grid; grid-template-columns: 140px 1fr; gap:8px; align-items:center; }
+    .muted { color:#a7acb5; }
+
+    /* Tighten cards and areas */
+    .card { padding: var(--pad-card); }
+    .top-actions { display:flex; gap:8px; align-items:center; }
+    .form-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; flex-wrap:wrap; }
+
+    /* Inputs compact */
+    input.input, select.input, .row input, .row select {
+      min-height: var(--input-min-h);
+      padding:6px 8px;
+    }
+
+    /* Table: compact, minimal padding */
+    .table { width:100%; border-collapse:collapse; }
+    .table th, .table td { padding:8px 10px; border-bottom:1px solid #2a2a2a; text-align:left; }
+    .table thead th { background:rgba(255,255,255,0.04); }
+    .table tr:last-child td { border-bottom:0; }
+
+    /* Action buttons in table rows */
+    .row-actions { display:flex; gap:8px; justify-content:flex-end; }
+  </style>
+</head>
+
+<body class="theme-dark">
+  <!-- Header -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP" />
+      <h1>One &amp; Done • Players</h1>
+    </div>
+    <!-- Quiet gray nav -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+ <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Overview</a>
+ <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>     
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:1100px;">
+    <!-- Add / Edit Player -->
+    <section class="card">
+      <h3 style="margin:0 0 6px 0;">Add / Edit Player</h3>
+      <div class="grid cols-2">
+        <div class="row">
+          <label>Full Name</label>
+          <input id="p.full_name" placeholder="e.g., Patrick Mahomes" />
+        </div>
+        <div class="row">
+          <label>Position</label>
+          <select id="p.position">
+            <option>QB</option><option>RB</option><option>WR</option>
+            <option>TE</option><option>K</option><option>DST</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Team</label>
+          <input id="p.team" placeholder="e.g., KC" />
+        </div>
+        <!-- Game Date (ET) -->
+        <div class="row">
+          <label>Game Date (ET)</label>
+          <input id="p.game_date" type="date" />
+        </div>
+        <!-- Game Time (ET) -->
+        <div class="row">
+          <label>Game Time (ET)</label>
+          <input id="p.game_time" type="text" placeholder="13:00 or 1:00 PM" />
+        </div>
+      </div>
+
+      <!-- Form actions -->
+      <div class="form-actions">
+        <button class="btn btn--ghost-danger btn--sm" id="p.reset">Reset</button>
+        <button class="btn btn--ghost btn--sm" id="p.save">Save Player</button>
+      </div>
+    </section>
+
+    <!-- Sync Button (optional) -->
+    <section class="card" style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+      <button class="btn btn--ghost btn--sm" id="p.sync">Sync Players</button>
+    </section>
+
+    <!-- Player Table -->
+    <section class="card">
+      <h3 style="margin:0 0 6px 0;">Players</h3>
+      <div class="top-actions" style="margin-bottom:8px;">
+        <input id="s.search" class="input" placeholder="Search name/team" style="flex:1" />
+        <select id="s.position" class="input">
+          <option value="">All positions</option>
+          <option value="QB">QB</option><option value="RB">RB</option>
+          <option value="WR">WR</option><option value="TE">TE</option>
+          <option value="K">K</option><option value="DST">DST</option>
+        </select>
+      </div>
+
+      <table class="table" id="playersTable">
+        <thead>
+          <tr>
+            <th>Name</th><th>Pos</th><th>Team</th><th>Game Time (ET)</th><th style="width:200px;"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="empty" class="muted" hidden>No players yet.</div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <!-- Page logic (IDs preserved; styling & spacing updated) -->
+  <script>
+    (async () => {
+      // Admin gate (if helper exists)
+      try { if (typeof requireAdmin === 'function') await requireAdmin(); } catch(_) {}
+
+      // Robust logout
+      document.getElementById("logout-btn")?.addEventListener("click", async () => {
+        try { if (typeof doLogout === "function") { await doLogout(); return; } } catch(e){}
+        window.location.href = "../index.html";
+      });
+
+      // --- Form fields
+      const fName = document.getElementById("p.full_name");
+      const fPos  = document.getElementById("p.position");
+      const fTeam = document.getElementById("p.team");
+      const fDate = document.getElementById("p.game_date");
+      const fTime = document.getElementById("p.game_time");
+      const btnSave  = document.getElementById("p.save");
+      const btnReset = document.getElementById("p.reset");
+
+      // --- Filters / table
+      const sSearch  = document.getElementById("s.search");
+      const sPos     = document.getElementById("s.position");
+      const tbody    = document.querySelector("#playersTable tbody");
+      const empty    = document.getElementById("empty");
+
+      let editId = null;
+
+      // Helpers
+      function escapeHtml(s) {
+        return (s ?? "").replace(/[&<>\"']/g, c => ({'&':'&','<':'<','>':'>','"':'"','\'':'\''}[c]));
+      }
+      function resetForm() {
+        editId = null; fName.value=""; fPos.value="QB"; fTeam.value=""; fDate.value=""; fTime.value="";
+      }
+
+      // Convert ET date/time to UTC ISO (simple offset guess for dev)
+      function etToUtcISO(dateStr, timeStr) {
+        if (!dateStr || !timeStr) return null;
+        // Normalize time 13:00 OR 1:00 PM
+        let hh=0, mm=0, t=timeStr.trim();
+        const m24 = t.match(/^(\d{1,2}):(\d{2})$/);
+        if (m24){ hh=+m24[1]; mm=+m24[2]; }
+        else{
+          const m12 = t.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+          if (!m12) return null;
+          hh=+m12[1]; mm=+m12[2];
+          const ampm=m12[3].toLowerCase();
+          if (ampm==='pm' && hh<12) hh+=12;
+          if (ampm==='am' && hh===12) hh=0;
+        }
+        const [y,mo,d] = dateStr.split("-").map(Number);
+        const etDate = new Date(Date.UTC(y,mo-1,d,hh,mm,0));
+        const fmt = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Toronto",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).formatToParts(etDate);
+        const parts = Object.fromEntries(fmt.map(p=>[p.type,p.value]));
+        const offsetGuess = "-05:00"; // dev; DST may be -04:00
+        const finalET = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:00${offsetGuess}`;
+        return new Date(finalET).toISOString();
+      }
+
+      // Load players
+      async function loadPlayers() {
+        let q = sb.from("players")
+          .select("id, full_name, position, team, game_start_utc")
+          .order("full_name");
+        if (sPos.value)    q = q.eq("position", sPos.value);
+        if (sSearch.value) q = q.ilike("full_name", `%${sSearch.value}%`);
+        const { data, error } = await q;
+        if (error){ alert(error.message); return; }
+
+        const rows = data ?? [];
+        empty.hidden = rows.length > 0;
+
+        tbody.innerHTML = rows.map(p => {
+          const et = p.game_start_utc
+            ? new Intl.DateTimeFormat("en-US", { timeZone:"America/Toronto", dateStyle:"medium", timeStyle:"short" })
+                .format(new Date(p.game_start_utc))
+            : "—";
+          return `
+            <tr data-id="${p.id}">
+              <td>${escapeHtml(p.full_name || "")}</td>
+              <td>${p.position || ""}</td>
+              <td>${p.team || ""}</td>
+              <td>${et}</td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn btn--ghost btn--sm" data-act="edit">Edit</button>
+                  <button class="btn btn--ghost-danger btn--sm" data-act="del">Delete</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join("");
+
+        tbody.querySelectorAll("button").forEach(btn => {
+          btn.onclick = async (e) => {
+            const tr  = e.target.closest("tr");
+            const id  = tr.dataset.id;
+            const act = e.target.dataset.act;
+
+            if (act === "edit") {
+              const { data, error } = await sb.from("players").select("*").eq("id", id).single();
+              if (error){ alert(error.message); return; }
+
+              editId = data.id;
+              fName.value = data.full_name || "";
+              fPos.value  = data.position  || "QB";
+              fTeam.value = data.team      || "";
+
+              if (data.game_start_utc) {
+                const d = new Date(data.game_start_utc);
+                fDate.value = d.toLocaleDateString("en-CA", { timeZone:"America/Toronto" });
+                fTime.value = d.toLocaleTimeString("en-GB", { timeZone:"America/Toronto", hour:"2-digit", minute:"2-digit", hour12:false });
+              } else {
+                fDate.value = ""; fTime.value = "";
+              }
+            }
+
+            if (act === "del") {
+              if (!confirm("Delete this player?")) return;
+              const { error } = await sb.from("players").delete().eq("id", id);
+              if (error){ alert(error.message); return; }
+              loadPlayers();
+            }
+          };
+        });
+      }
+
+      // Save player
+      async function savePlayer(){
+        const payload = {
+          full_name: (fName.value || "").trim(),
+          position:   fPos.value,
+          team:      ((fTeam.value || "").trim()) || null,
+        };
+        if (!payload.full_name){ alert("Enter player name"); return; }
+
+        payload.game_start_utc = etToUtcISO(fDate.value, fTime.value); // nullable
+
+        let error;
+        if (editId) ({ error } = await sb.from("players").update(payload).eq("id", editId));
+        else        ({ error } = await sb.from("players").insert(payload));
+        if (error){ alert(error.message); return; }
+
+        resetForm();
+        loadPlayers();
+      }
+
+      // Wire up
+      document.getElementById("p.save").onclick  = savePlayer;
+      document.getElementById("p.reset").onclick = resetForm;
+      document.getElementById("s.search").oninput  = loadPlayers;
+      document.getElementById("s.position").onchange= loadPlayers;
+
+      await loadPlayers();
+    })();
+  </script>
+</body>
+</html>
+``

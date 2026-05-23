@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — Pools Catalog</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="logo.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles/buttons.css" />
+
+  <style>
+    /* Controls row */
+    .controls--ghost {
+      display: grid;
+      grid-template-columns: 1fr 180px 160px;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .controls--ghost input[type="search"],
+    .controls--ghost select {
+      background: transparent;
+      color: #cfd5df;
+      border: 1px solid #3a3f49;
+      font-size: 12px;
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .controls--ghost input::placeholder { color: #8e96a3; }
+    .controls--ghost input:focus,
+    .controls--ghost select:focus {
+      outline: none;
+      border-color: #4b91ff33;
+    }
+
+    /* Slightly slimmer topbar */
+    .topbar { padding-top: 10px; padding-bottom: 10px; }
+
+    .brand { display:flex; align-items:center; gap:10px; }
+    .logo--small { height: 24px; width: 24px; border-radius: 4px; }
+
+    .card-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+    /* Modal */
+    #rules-modal { position: fixed; inset: 0; display: none; z-index: 50; }
+    #rules-modal.open { display: block; }
+    #rules-modal .modal__backdrop { position: absolute; inset: 0; background: #0009; }
+    #rules-modal .modal__panel { position: relative; max-width: 760px; margin: 6vh auto 0; padding: 12px; }
+    #rules-modal .modal__header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  </style>
+</head>
+
+<body class="theme-dark">
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="logo.png" alt="DFP Logo" class="logo--small" />
+      <h1>Pools Catalog</h1>
+    </div>
+
+    <!-- Subtle buttons; Admin hidden by default -->
+    <div class="actions" style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn--quiet" href="admin/admin.html" id="admin-link" hidden>Admin Home</a>
+      <button class="btn btn--quiet" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <!-- Filters -->
+  <section class="controls container controls--ghost">
+    <input id="pool-search" type="search" placeholder="Search by sport or pool type…" />
+    <select id="filter-sport">
+      <option value="">All sports</option>
+      <option value="football">Football</option>
+      <option value="hockey">Hockey</option>
+      <option value="college">College</option>
+    </select>
+    <select id="sort-mode">
+      <option value="title_asc">A–Z</option>
+      <option value="title_desc">Z–A</option>
+      <option value="sport_asc">Sport A–Z</option>
+      <option value="sport_desc">Sport Z–A</option>
+    </select>
+  </section>
+
+  <main class="container">
+    <div id="catalog" class="catalog"></div>
+
+   <div id="empty-state" class="empty" style="display:none">
+  <p>No matching pools.</p>
+</div>
+  </main>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal">
+    <div class="modal__backdrop"></div>
+    <section class="modal__panel card">
+      <header class="modal__header">
+        <h3 id="rules-title" style="margin:0">Pool Rules</h3>
+        <button class="btn btn--white btn--sm" id="rules-close">Close</button>
+      </header>
+      <div class="modal__body" id="rules-body" style="max-height:60vh; overflow-y:auto; padding-right:8px;"></div>
+    </section>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <!-- IMPORTANT: load catalog as a module so ES imports work -->
+  <script type="module" src="js/dashboard-catalog.js"></script>
+
+  <script>
+    (async () => {
+      const ok = await requireAuth();
+
+      // Show admin link only for admins
+      const prof = await getProfile();
+      if (prof && prof.is_admin) {
+        const adminLink = document.getElementById('admin-link');
+        if (adminLink) adminLink.hidden = false;
+      }
+
+      // Logout
+      document.getElementById('logout-btn')?.addEventListener('click', doLogout);
+
+      // Modal close
+      const modal = document.getElementById('rules-modal');
+      document.getElementById('rules-close')?.addEventListener('click', () =>
+        modal.classList.remove('open')
+      );
+      modal.querySelector('.modal__backdrop')?.addEventListener('click', () =>
+        modal.classList.remove('open')
+      );
+    })();
+  </script>
+</body>
+</html>

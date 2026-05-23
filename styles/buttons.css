@@ -1,0 +1,176 @@
+/* styles/buttons.css
+   Unified buttons (updated to match your rounded, blue-outline style)
+*/
+
+/* Tokens */
+:root {
+  --surface-0: #0f1218;
+  --surface-1: #151a22;
+  --text-0: #f8fafc;     /* near-white for good contrast */
+  --text-1: #b8c2cf;     /* muted */
+  --ring: #5b7cff;
+
+  --blue-400: #5b7cff;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --red-500:  #ef4444;
+  --red-600:  #dc2626;
+  --white:    #ffffff;
+
+  --radius-pill: 9999px; /* pill look like your screenshot */
+  --btn-h:  42px;
+  --btn-px: 18px;
+  --outline-alpha: 52%;  /* how visible the outline is */
+}
+
+/* Base */
+.btn {
+  --btn-bg: transparent;
+  --btn-fg: var(--text-0);
+  --btn-bd: color-mix(in oklab, var(--blue-400) var(--outline-alpha), transparent);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: var(--btn-h);
+  padding: 0 var(--btn-px);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--btn-bd);              /* slightly thicker outline */
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-weight: 700;                               /* heavier text like screenshot */
+  line-height: 1;
+  user-select: none;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .02s ease;
+  box-shadow: 0 0 0 0 rgba(0,0,0,0);             /* no shadow by default */
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 40%, transparent);
+}
+
+.btn:active { transform: translateY(0.5px); }
+
+/* Sizes */
+.btn--sm { --btn-h: 34px; --btn-px: 14px; font-size: 0.9rem; }
+.btn--lg { --btn-h: 48px; --btn-px: 22px; font-size: 1rem; }
+
+/* Ghost (the “clear” look you want everywhere) */
+.btn--ghost {
+  background: color-mix(in oklab, #ffffff 3%, transparent); /* very subtle fill so it pops on hover */
+  border-color: color-mix(in oklab, var(--blue-400) var(--outline-alpha), transparent);
+  color: var(--text-0);
+}
+.btn--ghost:hover {
+  background: color-mix(in oklab, var(--blue-400) 14%, transparent); /* soft blue hover */
+  border-color: var(--blue-400);
+}
+
+/* Solid primary (optional if you need a filled CTA elsewhere) */
+.btn--primary {
+  --btn-bg: var(--blue-500);
+  --btn-fg: var(--white);
+  --btn-bd: color-mix(in oklab, var(--blue-600) 80%, transparent);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border-color: var(--btn-bd);
+}
+.btn--primary:hover { background: var(--blue-600); }
+
+/* Danger (delete) */
+.btn--danger {
+  --btn-bg: var(--red-500);
+  --btn-fg: var(--white);
+  --btn-bd: color-mix(in oklab, var(--red-600) 80%, transparent);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border-color: var(--btn-bd);
+}
+.btn--danger:hover { background: var(--red-600); }
+
+/* White (for top nav on dark backgrounds) */
+.btn--white {
+  --btn-bg: var(--white);
+  --btn-fg: #0b1220;
+  --btn-bd: color-mix(in oklab, #0b1220 10%, transparent);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border-color: var(--btn-bd);
+}
+.btn--white:hover { filter: brightness(0.95); }
+
+/* Optional icon-only */
+.btn--icon { width: var(--btn-h); padding: 0; }
+
+/* ----- Links like “Forgot password?” for readability on dark ----- */
+a.link-muted {
+  color: #9ac1ff;               /* much brighter blue for contrast */
+  text-decoration: none;
+}
+a.link-muted:hover { text-decoration: underline; }
+
+/* ===================== */
+/*  Tags (SPORT heading) */
+/* ===================== */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;               /* pill */
+  font-weight: 800;                    /* strong label like your sample */
+  letter-spacing: 0.4px;
+  font-size: 12px;
+  user-select: none;
+  border: 2px solid currentColor;
+}
+
+/* Green sport pill: outline + green text on dark BG */
+.tag--sport {
+  color: #2de38e;                      /* neon-ish green for contrast */
+  background: color-mix(in oklab, #2de38e 8%, transparent); /* gentle tint */
+}
+
+/* Optional hover if tags are clickable later */
+.tag--sport:hover {
+  background: color-mix(in oklab, #2de38e 16%, transparent);
+}
+
+/* ========================= */
+/*  Quiet (subtle) pill CTA  */
+/* ========================= */
+.btn--quiet {
+  --btn-h: 34px;                 /* smaller */
+  --btn-px: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;              /* lighter weight than other CTAs */
+  color: #aeb8c6;                /* muted text */
+  border-color: color-mix(in oklab, #aeb8c6 35%, transparent);
+  background: transparent;
+}
+
+.btn--quiet:hover {
+  color: #d6dbe3;                /* a bit brighter on hover */
+  border-color: color-mix(in oklab, #c9d1de 55%, transparent);
+  background: color-mix(in oklab, #ffffff 6%, transparent);
+}
+
+.btn--quiet:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent);
+}
+
+/* Clear red outline (destructive) */
+.btn--ghost-danger {
+  color: var(--red-500);
+  border-color: color-mix(in oklab, var(--red-500) var(--outline-alpha), transparent);
+  background: transparent;
+}
+.btn--ghost-danger:hover {
+  background: color-mix(in oklab, var(--red-500) 14%, transparent);
+  border-color: var(--red-500);
+  color: var(--red-500);
+}

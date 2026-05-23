@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — Weekly Pick'em (All Games)</title>
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP Logo" />
+      <h1>Weekly Pick'em (All Games)</h1>
+    </div>
+    <div class="actions">
+      <a class="btn subtle" href="../dashboard.html">Catalog</a>
+      <button class="btn" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="pool-header">
+      <div class="pool-title">
+        <span class="badge football">football</span>
+        <h2 style="margin:0">Weekly Pick'em (All Games)</h2>
+      </div>
+      <div id="lock-state" class="locked-hint"></div>
+    </section>
+
+    <section class="card" id="create-card">
+      <h3>Create a Team</h3>
+      <p class="muted">Team names must be unique in this pool.</p>
+      <form id="create-form">
+        <label>Team Name</label>
+        <input id="team-name" maxlength="60" required />
+        <button class="btn primary" type="submit">Create Team</button>
+      </form>
+      <p id="create-msg"></p>
+    </section>
+
+    <section class="card">
+      <h3>Your Teams</h3>
+      <div id="teams" class="team-list"></div>
+      <div id="teams-empty" class="muted" hidden>You have no teams yet.</div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script>
+    (async ()=>{
+      await requireAuth();
+      const pool = 'weekly-pickem';
+      const locked = await isPoolLocked(pool);
+      document.getElementById('lock-state').innerText = locked ? 'Pool is locked' : 'Pool is open';
+      if (locked) document.getElementById('create-card').style.display = 'none';
+
+      async function refresh(){
+        const teams = await fetchMyTeams(pool);
+        const list = document.getElementById('teams');
+        const empty = document.getElementById('teams-empty');
+        list.innerHTML='';
+        if(!teams.length){ empty.hidden=false; return; } else { empty.hidden=true; }
+        for(const t of teams){
+          const row = document.createElement('div');
+          row.className = 'team-item';
+          const label = document.createElement('div');
+          label.textContent = t.name + (t.disabled ? ' (disabled)' : '');
+          const actions = document.createElement('div');
+          actions.className = 'team-actions';
+          if(!locked){
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn subtle'; editBtn.textContent = 'Edit';
+            editBtn.onclick = async ()=>{
+              const nn = prompt('Rename team', t.name);
+              if(!nn) return;
+              try{ await renameTeam(t.id, nn, pool); refresh(); }
+              catch(err){ alert(err.message); }
+            };
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn danger'; delBtn.textContent = 'Delete';
+            delBtn.onclick = async ()=>{
+              if(confirm('Delete this team?')){ try{ await deleteTeam(t.id); refresh(); } catch(err){ alert(err.message); } }
+            };
+            actions.append(editBtn, delBtn);
+          }
+          row.append(label, actions);
+          list.appendChild(row);
+        }
+      }
+
+      document.getElementById('logout-btn').addEventListener('click', doLogout);
+
+      const form = document.getElementById('create-form');
+      if(form){
+        form.addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const name = document.getElementById('team-name').value.trim();
+          if(!name) return;
+          try{
+            await createTeam(pool, name);
+            document.getElementById('create-msg').textContent = `Team "${name}" added!`;
+            document.getElementById('team-name').value = '';
+            refresh();
+          }catch(err){ alert(err.message); }
+        });
+      }
+
+      refresh();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>One & Done — Lineup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Supabase libs + your config (correct script tags) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <!-- Email sender patch (after Supabase + config) -->
+  <script src="../js/send_pick_email_patch.js"></script>
+
+  <style>
+    :root{
+      --bg:#0d0f12; --panel:#121315; --panel-border:#24262a; --text:#e6e8eb; --muted:#b9bec7;
+      --chip:#1a1c20; --chip-border:#39414a; --ok:#9ef0b6; --warn:#ffd27a; --bad:#ffb4b4; --primary:#3b82f6;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    a{color:inherit;text-decoration:none}
+    .container{width:min(1060px,92vw);margin-inline:auto}
+    header{border-bottom:1px solid var(--panel-border);background:#0b0c0e}
+    .header-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+    .brand{display:flex;align-items:center;gap:10px}
+    .brand-title{font-weight:700}
+    .btn{
+      --btn-bg: var(--primary); --btn-border: var(--primary); --btn-text: #fff;
+      border:1px solid var(--btn-border); border-radius:8px; padding:9px 12px;
+      cursor:pointer; background:var(--btn-bg); color:var(--btn-text); font-weight:600;
+      transition: filter .15s ease, opacity .15s ease;
+    }
+    .btn:hover{ filter:brightness(1.07); }
+    .btn:active{ filter:brightness(0.96); }
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .input,.select{background:#111216;color:var(--text);border:1px solid var(--panel-border);border-radius:8px;padding:8px 10px;min-height:38px}
+    main{padding:18px 0 40px}
+    .block{background:var(--panel);border:1px solid var(--panel-border);border-radius:12px;padding:16px}
+    .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .space{flex:1}
+    .muted{color:var(--muted)}
+    .help{color:#9aa3ad;font-size:12px}
+    .divider{height:1px;background:var(--panel-border);margin:14px 0}
+    .grid{display:grid;gap:14px}
+    @media(min-width:900px){ .grid.cols-2{grid-template-columns:1fr 1fr} }
+
+    /* Slot card */
+    .ood-slot{
+      display:grid;grid-template-rows:auto 1fr;gap:8px;
+      background:#121315;border:1px solid #24262a;border-radius:10px;
+      padding:12px;min-height:120px;
+    }
+    .ood-slot__head{display:flex;align-items:center;gap:10px}
+    .ood-slot__title{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#dfe3ea}
+    .ood-slot__count{margin-left:auto;color:#b9bec7;font-size:12px}
+    .link-clear{
+      border:none;background:transparent;color:#9aa3ad;padding:0 4px;cursor:pointer;font-size:12px;
+      text-decoration:underline dotted 1px; border-radius:6px;
+    }
+    .link-clear:hover{color:#cdd3da}
+    .ood-slot__body{display:flex;flex-direction:column;gap:6px}
+
+    /* Player rows */
+    .ood-player{
+      display:grid; grid-template-columns: 1fr 220px; gap:10px;
+      background:#0f1012;border:1px solid #222428;border-radius:8px;
+      padding:6px 10px; align-items:center; height:44px; min-height:44px; line-height:1.15; overflow:hidden;
+      position:relative;
+    }
+    .ood-player__title{font-weight:700;font-size:13px;line-height:1.15;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ood-player__meta{margin-top:1px;font-size:11.5px;color:#b9bec7;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ood-player__aside{
+      display:flex;align-items:center;justify-content:flex-end;gap:8px;
+      min-width:220px;flex:0 0 220px;flex-wrap:nowrap;
+    }
+    .ood-player input[type="radio"], .ood-player input[type="checkbox"]{
+      appearance:none;width:16px;height:16px;border-radius:50%;
+      border:2px solid var(--primary);background:transparent;cursor:pointer;position:relative;flex:0 0 16px;
+    }
+    .ood-player input[type="radio"]:checked, .ood-player input[type="checkbox"]:checked{
+      background:var(--primary); box-shadow: inset 0 0 0 4px #111216;
+    }
+    .ood-player input:disabled{opacity:.6;cursor:not-allowed}
+    .is-used{opacity:.6}
+    .is-locked{opacity:.55}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;border:1px solid var(--chip-border);border-radius:999px;
+      padding:3px 8px;font-size:11.5px;background:var(--chip);color:#cdd3da;white-space:nowrap;min-width:64px;justify-content:center;flex:0 0 auto;
+    }
+    .pill--ok{border-color:#134e27;color:var(--ok)}
+    .pill--locked{border-color:#4d3e16;color:var(--warn)}
+    .pill--used{border-color:#5c1d1d;color:#ffb4b4}
+    .footer-row{display:flex;justify-content:flex-end;margin-top:10px}
+    .empty{color:#9aa3ad;font-size:12px;padding:6px 0}
+
+    /* Global toast (bottom-right) */
+    .toast-wrap{
+      position:fixed; right:16px; bottom:16px; display:grid; gap:8px; z-index:9999; pointer-events:none;
+    }
+    .toast{
+      background:#111216; border:1px solid #2a2d33; color:#e6e8eb; padding:10px 12px;
+      border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.35);
+      font-size:13px; line-height:1.25; pointer-events:auto; display:flex; align-items:center; gap:8px;
+      opacity:0; transform:translateY(8px); animation:toast-in .18s ease forwards;
+    }
+    .toast--warn{ border-color:#4d3e16; color:#ffd27a; }
+    .toast--error{ border-color:#5c1d1d; color:#ffb4b4; }
+    .toast--ok{ border-color:#134e27; color:#9ef0b6; }
+    @keyframes toast-in{ to{ opacity:1; transform:translateY(0);} }
+
+    /* Inline hint */
+    .inline-hint{
+      position:absolute; right:12px; bottom:6px; font-size:11.5px; color:#ffd27a;
+      background:#1a1c20; border:1px dashed #4d3e16; border-radius:6px; padding:2px 6px; opacity:0; transform:translateY(4px);
+      animation:hint-in .12s ease forwards;
+    }
+    @keyframes hint-in{ to{ opacity:1; transform:translateY(0);} }
+
+    /* Summary bar */
+    .summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:relative}
+    .summary h3{margin:0 8px 0 0;font-size:14px}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid #2a2d33;background:#14161b;color:#dfe3ea;font-size:12.5px;
+      cursor:pointer; user-select:none;
+    }
+    .chip .x{display:inline-block;width:14px;height:14px;border-radius:50%;background:#2a2d33;color:#c9cdd4;font-weight:700;line-height:14px;text-align:center;font-size:11px}
+    .chip:hover{filter:brightness(1.08)}
+    .summary-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+    .summary-missing{color:#ffd27a;font-size:12.5px}
+
+    /* Summary-local toast (near “Your Picks”) */
+    .summary-toast-wrap{
+      position:absolute; right:12px; bottom:-8px; transform:translateY(100%);
+      display:grid; gap:8px; pointer-events:none; z-index:2;
+    }
+    .summary-toast{
+      background:#111216; border:1px solid #2a2d33; color:#e6e8eb; padding:8px 10px;
+      border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.35);
+      font-size:12.5px; line-height:1.25; pointer-events:auto; display:flex; align-items:center; gap:8px;
+      opacity:0; transform:translateY(6px); animation:toast-in .16s ease forwards;
+    }
+    .summary-toast--ok{ border-color:#134e27; color:#9ef0b6; }
+    .summary-toast--warn{ border-color:#4d3e16; color:#ffd27a; }
+
+    /* Email opt-in toggle */
+    .toggle {
+      --w: 40px; --h: 22px;
+      position: relative; display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
+      font-size:12.5px; color:#dfe3ea;
+    }
+    .toggle input { display:none; }
+    .toggle .track {
+      width: var(--w); height: var(--h); border-radius:999px; background:#2a2d33; position:relative; transition:.15s ease background;
+      border:1px solid #39414a;
+    }
+    .toggle .thumb {
+      position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#c9cdd4; transition:.15s ease left, .15s ease background;
+    }
+    .toggle input:checked + .track { background:#2b3b7a; border-color:#2b3b7a; }
+    .toggle input:checked + .track .thumb { left: calc(var(--w) - 20px); background:#9ef0b6; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container header-row">
+      <div class="brand"><strong class="brand-title">One & Done — Lineup</strong></div>
+      <div class="row">
+        <a class="btn" href="../dashboard.html" style="--btn-bg:#1d2440;--btn-border:#2b3b7a">Back to Pools</a>
+        <button id="logoutBtn" class="btn">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="block">
+      <div class="row">
+        <h2 id="teamHeading" style="margin:0">Your Lineup</h2>
+        <span class="space"></span>
+        <div id="windowChip" class="pill">All Players</div>
+        <div id="lockedChip" class="pill" title="Players that are locked (kickoff passed)">Locked: 0</div>
+      </div>
+      <div class="divider"></div>
+      <div class="help">
+        • Click a player to select. • <b>Used</b> = already used in a past started window; <b>Locked</b> = this player’s kickoff has passed.<br/>
+        • Slot counts & FLEX rules come from <code>roster_settings</code> (defaults used if missing).<br/>
+        • Save writes to Supabase (<code>one_and_done_picks</code>) for this entry; re‑loading restores your choices.
+      </div>
+    </section>
+
+    <!-- Summary bar -->
+    <section id="summaryBlock" class="block" style="margin-top:12px; display:none;">
+      <div class="summary">
+        <h3>Your Picks</h3>
+        <div id="summaryChips" class="row" style="gap:8px;"></div>
+        <div class="summary-right">
+          <label class="toggle" title="Email me a confirmation after I save">
+            <input id="emailOptIn" type="checkbox" />
+            <span class="track"><span class="thumb"></span></span>
+            Email me a confirmation
+          </label>
+          <div id="summaryMissing" class="summary-missing" hidden></div>
+          <button id="clearAllBtn" class="btn" style="--btn-bg:#1d2440;--btn-border:#2b3b7a">Clear All</button>
+        </div>
+        <!-- Local toast anchor -->
+        <div id="summaryToastWrap" class="summary-toast-wrap" aria-live="polite" aria-atomic="true"></div>
+      </div>
+    </section>
+
+    <section class="block" style="margin-top:16px">
+      <h2 style="margin:0 0 10px 0">Choose Your Lineup</h2>
+      <div class="row" style="margin-bottom:8px">
+        <div class="row" id="windowBlock" hidden>
+          <label class="help" for="windowSelect">Window</label>
+          <select id="windowSelect" class="select"></select>
+        </div>
+        <div class="row">
+          <label class="help" for="filterInput">Filter</label>
+          <input id="filterInput" class="input" placeholder="Search player or team…" />
+        </div>
+        <span class="space"></span>
+        <button id="refreshBtn" class="btn">Refresh</button>
+      </div>
+
+      <div id="slotsGrid" class="grid cols-2"></div>
+
+      <div class="footer-row">
+        <button id="saveBtn" class="btn" disabled>Save Lineup</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Global toast container -->
+  <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    /* ---------- Supabase client & auth ---------- */
+    function getSupabaseClient(){
+      if (window.supabaseClient && typeof window.supabaseClient.from === 'function') return window.supabaseClient;
+      var url = window.SUPABASE_URL || window.SB_URL;
+      var key = window.SUPABASE_ANON_KEY || window.SB_ANON_KEY;
+      if (!window.supabase || typeof window.supabase.createClient !== 'function') throw new Error('Supabase library not loaded.');
+      if (!url || !key) throw new Error('Supabase URL/key missing. Check ../js/config.js.');
+      window.supabaseClient = window.supabase.createClient(url, key);
+      return window.supabaseClient;
+    }
+    var supa = getSupabaseClient();
+    // Expose the client so send_pick_email_patch.js can find it
+    window.sb = supa;
+
+    async function ensureAuth(){ if (typeof window.requireAuth === 'function') await window.requireAuth(); }
+    function goLogout(){ if (typeof window.doLogout === 'function') return window.doLogout(); location.href='../index.html'; }
+
+    /* ---------- Toast helpers ---------- */
+    function showToast(msg, kind, ms){
+      kind = kind || 'warn'; ms = ms || 2000;
+      var wrap = document.getElementById('toastWrap');
+      var div = document.createElement('div');
+      div.className = 'toast toast--' + kind;
+      div.textContent = msg;
+      wrap.appendChild(div);
+      var t = setTimeout(function(){
+        div.style.transition='opacity .18s ease, transform .18s ease';
+        div.style.opacity='0'; div.style.transform='translateY(8px)';
+        setTimeout(function(){ div.remove(); }, 220);
+      }, ms);
+      div.addEventListener('click', function(){ clearTimeout(t); div.remove(); });
+    }
+    function showSummaryToast(msg, kind, ms){
+      kind = kind || 'ok'; ms = ms || 1600;
+      var wrap = document.getElementById('summaryToastWrap');
+      var div = document.createElement('div');
+      div.className = 'summary-toast summary-toast--' + kind;
+      div.textContent = msg;
+      wrap.appendChild(div);
+      var t = setTimeout(function(){
+        div.style.transition='opacity .16s ease, transform .16s ease';
+        div.style.opacity='0'; div.style.transform='translateY(6px)';
+        setTimeout(function(){ div.remove(); }, 200);
+      }, ms);
+      div.addEventListener('click', function(){ clearTimeout(t); div.remove(); });
+    }
+    function showInlineHint(rowEl, msg, ms){
+      ms = ms || 1800;
+      if (!rowEl) return;
+      var old = rowEl.querySelector('.inline-hint'); if (old) old.remove();
+      var hint = document.createElement('div'); hint.className='inline-hint'; hint.textContent = msg;
+      rowEl.appendChild(hint);
+      setTimeout(function(){ hint.style.transition='opacity .18s ease, transform .18s ease'; hint.style.opacity='0'; hint.style.transform='translateY(4px)'; setTimeout(function(){ hint.remove(); }, 220); }, ms);
+    }
+
+    /* ---------- State / helpers ---------- */
+    var $ = function(id){ return document.getElementById(id); };
+    var ALL_PLAYERS_VALUE = '__ALL__';
+    var DEFAULT_CAPS = { QB:1, RB:1, WR:1, TE:1, FLEX:1, K:1, DST:1 };
+    var USED_PLAYER_IDS = new Set([]);
+    var state = {
+      caps: { QB:1, RB:1, WR:1, TE:1, FLEX:1, K:1, DST:1 },
+      flexAllow: ['RB','WR','TE'],
+      windows: [],
+      windowsMap: {},
+      windowId: ALL_PLAYERS_VALUE,
+      playersBySlot: { QB:[], RB:[], WR:[], TE:[], FLEX:[], K:[], DST:[] },
+      playersIndex: {},
+      distinctPos: [],
+      resolverNote: null
+    };
+    function getParam(){
+      var u = new URL(window.location.href);
+      for (var i=0;i<arguments.length;i++){
+        var k = arguments[i];
+        var v = u.searchParams.get(k);
+        if (v) return v;
+      }
+      return null;
+    }
+    function getEntryParam(){ return getParam('entry_id','entryId','entry'); }
+    function getTeamParam(){ return getParam('team','team_id','teamId'); }
+    function getTeamNameHint(){
+      var u = new URL(window.location.href);
+      return u.searchParams.get('teamName') || u.searchParams.get('name');
+    }
+    async function getUserId(){
+      var res = await supa.auth.getUser();
+      return (res && res.data && res.data.user && res.data.user.id) ? res.data.user.id : null;
+    }
+
+    function normalizePos(raw){
+      var pos = (raw || '').toString().trim().toUpperCase();
+      if (pos === 'PK') pos = 'K';
+      if (['DEF','D/ST','D-ST','DEFENSE','D'].indexOf(pos) >= 0) pos = 'DST';
+      if (pos === 'QB1') pos = 'QB';
+      if (pos === 'RB1') pos = 'RB';
+      if (pos === 'WR1') pos = 'WR';
+      return pos;
+    }
+
+    /* ---------- Loads ---------- */
+    async function loadRosterSettings(){
+      var q = await supa
+        .from('roster_settings')
+        .select('position,quantity,is_flex,allowed_positions')
+        .order('position', { ascending:true });
+      var data = q.data, error = q.error;
+      if (error || !data || !data.length){
+        state.caps = { QB:1, RB:1, WR:1, TE:1, FLEX:1, K:1, DST:1 };
+        state.flexAllow = ['RB','WR','TE'];
+        showToast(error ? 'Roster settings failed — using defaults.' : 'No roster settings found — using defaults.', 'warn');
+        return;
+      }
+      var caps = { QB:1, RB:1, WR:1, TE:1, FLEX:1, K:1, DST:1 };
+      var flexAllow = ['RB','WR','TE'];
+      data.forEach(function(r){
+        var pos = normalizePos(r.position);
+        if (pos === 'FLEX'){
+          caps.FLEX = Math.max(0, Number(r.quantity || 1));
+          var allowed = (r.allowed_positions || []).map(normalizePos).filter(function(p){ return ['RB','WR','TE'].indexOf(p) >= 0; });
+          flexAllow = allowed.length ? allowed : ['RB','WR','TE'];
+        } else if (['QB','RB','WR','TE','K','DST'].indexOf(pos) >= 0) {
+          caps[pos] = Math.max(0, Number(r.quantity || caps[pos]));
+        }
+      });
+      var total = ['QB','RB','WR','TE','FLEX','K','DST'].reduce(function(s,k){ return s + (caps[k]||0); }, 0);
+      state.caps = total === 0 ? { QB:1, RB:1, WR:1, TE:1, FLEX:1, K:1, DST:1 } : caps;
+      state.flexAllow = flexAllow;
+      if (total === 0) showToast('Roster caps were all zero — using defaults.', 'warn');
+    }
+
+    async function loadWindows(){
+      var q = await supa
+        .from('round_time_windows')
+        .select('id,label,start_at_utc')
+        .order('start_at_utc', { ascending:true });
+      var data = q.data, error = q.error;
+      if (error) { $('windowBlock').hidden = true; state.windowId = ALL_PLAYERS_VALUE; return; }
+      state.windows = data || [];
+      state.windowsMap = {};
+      (data || []).forEach(function(w){ state.windowsMap[String(w.id)] = w; });
+
+      var block = $('windowBlock');
+      var sel = $('windowSelect');
+      if (state.windows.length){
+        block.hidden = false;
+        sel.innerHTML = '';
+        var optAll = document.createElement('option'); optAll.value = ALL_PLAYERS_VALUE; optAll.textContent = 'All Players'; sel.appendChild(optAll);
+        state.windows.forEach(function(w){ var o=document.createElement('option'); o.value=w.id; o.textContent=w.label; sel.appendChild(o); });
+        sel.value = state.windowId;
+        $('windowChip').textContent =
+          (state.windowId === ALL_PLAYERS_VALUE) ? 'All Players'
+          : ((state.windows.find ? (state.windows.find(function(w){ return String(w.id)===String(state.windowId); }) || {}).label : null) || 'Window');
+      } else {
+        block.hidden = true; $('windowChip').textContent = 'All Players'; state.windowId = ALL_PLAYERS_VALUE;
+      }
+    }
+
+    async function loadPlayers(){
+      var base = supa.from('players').select('id, full_name, position, team, time_window_id');
+      var q = (state.windowId !== ALL_PLAYERS_VALUE && state.windows.length)
+        ? base.eq('time_window_id', state.windowId).order('full_name',{ ascending:true })
+        : base.order('full_name',{ ascending:true });
+      var res = await q; var data = res.data, error = res.error; if (error) throw error;
+
+      var slots = { QB:[], RB:[], WR:[], TE:[], FLEX:[], K:[], DST:[] };
+      var idx = {};
+      var seen = {};
+
+      (data || []).forEach(function(p){
+        var pos = normalizePos(p.position);
+        var team = (p.team || '').toString().trim().toUpperCase();
+        seen[pos] = true;
+        var rec = { id:p.id, name:p.full_name, team_abbr:team, time_window_id:p.time_window_id };
+        idx[String(p.id)] = rec;
+        if (['QB','RB','WR','TE','K','DST'].indexOf(pos) >= 0) {
+          if ((state.caps[pos] || 0) > 0) slots[pos].push(rec);
+          if ((state.caps.FLEX || 0) > 0 && state.flexAllow.indexOf(pos) >= 0) slots.FLEX.push(rec);
+        }
+      });
+
+      state.playersBySlot = slots;
+      state.playersIndex = idx;
+      state.distinctPos = Object.keys(seen);
+      updateLockedChip();
+    }
+
+    /* ---------- Locking & USED ---------- */
+    function isPlayerStarted(p){
+      var wid = p && p.time_window_id;
+      var w = wid ? state.windowsMap[String(wid)] : null;
+      if (!w || !w.start_at_utc) return false;
+      var startMs = Date.parse(w.start_at_utc);
+      return isFinite(startMs) && Date.now() >= startMs;
+    }
+
+    async function loadUsedPlayers(entryId){
+      var res = await supa.from('one_and_done_picks').select('player_id, window_id').eq('entry_id', entryId);
+      var data = res.data, error = res.error;
+      if (error){ USED_PLAYER_IDS = new Set([]); return; }
+      function windowStarted(wid){
+        if (!wid) return false;
+        var w = state.windowsMap[String(wid)];
+        if (!w || !w.start_at_utc) return false;
+        var ms = Date.parse(w.start_at_utc);
+        return isFinite(ms) && Date.now() >= ms;
+      }
+      var used = new Set();
+      (data || []).forEach(function(r){ if (windowStarted(r.window_id)) used.add(String(r.player_id)); });
+      USED_PLAYER_IDS = used;
+    }
+
+    /* ---------- Locked chip ---------- */
+    function updateLockedChip(){
+      var listed = ['QB','RB','WR','TE','FLEX','K','DST']
+        .reduce(function(arr, s){ return arr.concat(state.playersBySlot[s] || []); }, []);
+      var locked = listed.filter(isPlayerStarted).length;
+      var chip = document.getElementById('lockedChip');
+      if (chip) chip.textContent = 'Locked: ' + locked;
+    }
+
+    /* ---------- Rendering ---------- */
+    function slotTitleText(slot){
+      return (slot === 'FLEX') ? ('FLEX ×' + state.caps.FLEX) : (slot + (state.caps[slot] > 1 ? (' ×' + state.caps[slot]) : ''));
+    }
+    function buildSlotCard(slot){
+      var cap = state.caps[slot] || 0;
+      var slotId = 'slot-' + slot.toLowerCase();
+      var selCountId = 'sel-count-' + slot.toLowerCase();
+      var card = document.createElement('section');
+      card.className = 'ood-slot'; card.id = slotId; card.dataset.slot = slot;
+      var head = document.createElement('div'); head.className = 'ood-slot__head';
+      var title = document.createElement('h3'); title.className = 'ood-slot__title'; title.textContent = slotTitleText(slot);
+      var clearBtn = document.createElement('button'); clearBtn.className='link-clear'; clearBtn.type='button'; clearBtn.textContent='Clear';
+      clearBtn.addEventListener('click', function(){ clearSlot(slot); });
+      var count = document.createElement('div'); count.className='ood-slot__count';
+      count.innerHTML = 'Selected <span id="'+selCountId+'">0</span> of ' + cap;
+      head.appendChild(title); head.appendChild(clearBtn); head.appendChild(count);
+      var body = document.createElement('div'); body.className='ood-slot__body'; body.id = slot.toLowerCase() + '-list';
+      card.appendChild(head); card.appendChild(body);
+      return card;
+    }
+    function renderSlots(){
+      var grid = $('slotsGrid'); grid.innerHTML='';
+      ['QB','RB','WR','TE','FLEX','K','DST'].forEach(function(s){ if ((state.caps[s] || 0) > 0) grid.appendChild(buildSlotCard(s)); });
+      if (!grid.children.length){
+        state.caps = { QB:1, RB:1, WR:1, TE:1, FLEX:1, K:1, DST:1 };
+        showToast('No roster slots configured — using defaults.', 'warn');
+        ['QB','RB','WR','TE','FLEX','K','DST'].forEach(function(s){ grid.appendChild(buildSlotCard(s)); });
+      }
+    }
+
+    /* Duplicate guard helpers */
+    function isSelectedInPrimary(pid){
+      var radioHit = ['RB','WR','TE'].some(function(s){
+        return !!document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+s+'"][data-player-id="'+pid+'"]:checked');
+      });
+      if (radioHit) return true;
+      return ['RB','WR','TE'].some(function(s){
+        return !!document.querySelector('.ood-player__aside input[type="checkbox"][name="pick-'+s+'-'+pid+'"]:checked');
+      });
+    }
+    function whichPrimary(pid){
+      for (var i=0;i<3;i++){
+        var s = ['RB','WR','TE'][i];
+        var r = document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+s+'"][data-player-id="'+pid+'"]:checked');
+        if (r) return s;
+        var c = document.querySelector('.ood-player__aside input[type="checkbox"][name="pick-'+s+'-'+pid+'"]:checked');
+        if (c) return s;
+      }
+      return null;
+    }
+    function isSelectedInFlex(pid){
+      var multi = (state.caps.FLEX || 1) > 1;
+      if (multi) return !!document.querySelector('.ood-player__aside input[name="pick-FLEX-'+pid+'"]:checked');
+      return !!document.querySelector('.ood-player__aside input[type="radio"][name="pick-FLEX"][data-player-id="'+pid+'"]:checked');
+    }
+
+    function renderPlayers(slot){
+      var list = $(slot.toLowerCase()+'-list'); if (!list) return; list.innerHTML='';
+      var cap = state.caps[slot] || 0;
+      var isMulti = cap > 1;
+      var filter = ( $('filterInput').value || '' ).trim().toLowerCase();
+      var players = (state.playersBySlot[slot] || []).filter(function(p){
+        return ( (p.name||'').toLowerCase().indexOf(filter) >= 0 ) || ( (p.team_abbr||'').toLowerCase().indexOf(filter) >= 0 );
+      });
+      if (!players.length){
+        var empty=document.createElement('div'); empty.className='empty'; empty.textContent='No players for this slot.'; list.appendChild(empty);
+        updateSelectedCount(slot); return;
+      }
+      players.forEach(function(p){
+        var reused = USED_PLAYER_IDS.has(String(p.id));
+        var started = isPlayerStarted(p);
+        var row = document.createElement('div'); row.className='ood-player';
+        if (reused) row.classList.add('is-used');
+        if (started) row.classList.add('is-locked');
+
+        var left = document.createElement('div');
+        var title = document.createElement('div'); title.className='ood-player__title'; title.textContent = p.name;
+        var meta = document.createElement('div'); meta.className='ood-player__meta'; meta.textContent = (p.team_abbr || '');
+        left.appendChild(title); left.appendChild(meta);
+
+        var right = document.createElement('div'); right.className='ood-player__aside';
+        var input = document.createElement('input');
+
+        if (slot === 'FLEX'){
+          if (isMulti) { input.type='checkbox'; input.name='pick-FLEX-'+p.id; }
+          else { input.type='radio'; input.name='pick-FLEX'; }
+        } else {
+          if (isMulti) { input.type='checkbox'; input.name='pick-'+slot+'-'+p.id; }
+          else { input.type='radio'; input.name='pick-'+slot; }
+        }
+        input.dataset.slot = slot; input.dataset.playerId = p.id;
+        input.disabled = !!(reused || started);
+        input.addEventListener('change', function(){ onSelect(slot, p, input, row); updateSummaryBar(); });
+        right.appendChild(input);
+
+        function pill(t,c){ var x=document.createElement('span'); x.className='pill '+c; x.textContent=t; return x; }
+        if (reused) right.appendChild(pill('Used','pill--used'));
+        if (started) right.appendChild(pill('Locked','pill--locked'));
+        if (!reused && !started) right.appendChild(pill('Eligible','pill--ok'));
+
+        row.appendChild(left); row.appendChild(right);
+        list.appendChild(row);
+      });
+      updateSelectedCount(slot);
+    }
+
+    function renderAllPlayers(){
+      ['QB','RB','WR','TE','FLEX','K','DST'].forEach(function(s){ if ((state.caps[s] || 0) > 0) renderPlayers(s); });
+      applySavedOrDbPicks().then(function(){ recomputeAllCountsFromDOM(); updateSummaryBar(); });
+    }
+
+    /* ---------- Counts & clearing ---------- */
+    function updateSelectedCount(slot){
+      var cap = state.caps[slot] || 0;
+      var count = 0;
+      if (cap > 1){
+        count = document.querySelectorAll('.ood-player__aside input[name^="pick-'+slot+'-"]:checked').length;
+        if (slot === 'FLEX'){
+          count = document.querySelectorAll('.ood-player__aside input[name^="pick-FLEX-"]:checked').length;
+        }
+      } else {
+        var name = (slot === 'FLEX') ? 'pick-FLEX' : ('pick-'+slot);
+        count = document.querySelectorAll('.ood-player__aside input[type="radio"][name="'+name+'"]:checked').length;
+      }
+      var el = document.getElementById('sel-count-'+slot.toLowerCase()); if (el) el.textContent = String(count);
+      $('saveBtn').disabled = !isValidToSave();
+    }
+    function recomputeAllCountsFromDOM(){ ['QB','RB','WR','TE','FLEX','K','DST'].forEach(function(s){ if ((state.caps[s] || 0) > 0) updateSelectedCount(s); }); }
+    function clearSlot(slot, silent){
+      silent = !!silent;
+      var cap = state.caps[slot] || 0;
+      if (cap > 1){
+        var sel = (slot === 'FLEX') ? 'input[name^="pick-FLEX-"]:checked' : 'input[name^="pick-'+slot+'-"]:checked';
+        document.querySelectorAll('.ood-player__aside '+sel).forEach(function(i){ i.checked=false; });
+      } else {
+        var name = (slot === 'FLEX') ? 'pick-FLEX' : ('pick-'+slot);
+        document.querySelectorAll('.ood-player__aside input[type="radio"][name="'+name+'"]:checked').forEach(function(i){ i.checked=false; });
+      }
+      updateSelectedCount(slot);
+      updateSummaryBar();
+      if (!silent) showToast('Cleared '+slot, 'ok', 1400);
+    }
+    function handleClearAll(){
+      ['QB','RB','WR','TE','FLEX','K','DST'].forEach(function(slot){ clearSlot(slot, true); });
+      updateSummaryBar();
+      showSummaryToast('Cleared all picks', 'ok', 1400);
+    }
+    // Click-again-to-unselect radios
+    document.addEventListener('mousedown', function(e){
+      var t = e.target; if (t && t.tagName==='INPUT' && t.type==='radio') t.dataset.wasChecked = t.checked ? '1' : '';
+    }, true);
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if (t && t.tagName==='INPUT' && t.type==='radio' && t.dataset.wasChecked === '1'){
+        t.checked = false; t.dispatchEvent(new Event('change', { bubbles:true })); t.dataset.wasChecked='';
+      }
+    }, true);
+    function onSelect(slot, player, inputEl, rowEl){
+      var checked = !!inputEl.checked;
+      var cap = state.caps[slot] || 0;
+      var isMulti = cap > 1;
+      // Duplicate guard
+      if (checked){
+        if (slot === 'FLEX'){
+          var already = whichPrimary(player.id);
+          if (already){ inputEl.checked=false; showInlineHint(rowEl, 'Already at '+already+'. Clear it there first.'); return; }
+        } else if (['RB','WR','TE'].indexOf(slot) >= 0){
+          if (isSelectedInFlex(player.id)){ inputEl.checked=false; showInlineHint(rowEl, 'Already in FLEX. Clear FLEX first.'); return; }
+        }
+      }
+      // Slot cap enforcement / radio grouping
+      if (isMulti){
+        var sel = (slot === 'FLEX') ? 'input[name^="pick-FLEX-"]:checked' : 'input[name^="pick-'+slot+'-"]:checked';
+        var checkedCount = document.querySelectorAll('.ood-player__aside '+sel).length;
+        if (checked && checkedCount > cap){
+          inputEl.checked=false;
+          showInlineHint(rowEl, slot+' allows only '+cap+'.');
+          return;
+        }
+      } else {
+        var name = (slot === 'FLEX') ? 'pick-FLEX' : ('pick-'+slot);
+        if (checked){
+          document.querySelectorAll('.ood-player__aside input[type="radio"][name="'+name+'"]').forEach(function(inp){ if (inp !== inputEl) inp.checked=false; });
+        }
+      }
+      updateSelectedCount(slot);
+    }
+    function isValidToSave(){ return !!document.querySelector('.ood-player__aside input:checked'); }
+
+    /* ---------- Summary bar ---------- */
+    function getSelectedMap(){
+      var map = { QB:[], RB:[], WR:[], TE:[], FLEX:[], K:[], DST:[] };
+      ['QB','RB','WR','TE','K','DST'].forEach(function(slot){
+        var cap = state.caps[slot] || 0;
+        if (cap > 1){
+          var nodes = Array.prototype.slice.call(document.querySelectorAll('.ood-player__aside input[name^="pick-'+slot+'-"]:checked'));
+          map[slot] = nodes.map(function(i){ return i.name.replace('pick-'+slot+'-',''); });
+        } else {
+          var sel = document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+slot+'"]:checked');
+          if (sel) map[slot] = [sel.dataset.playerId];
+        }
+      });
+      if ((state.caps.FLEX || 1) > 1){
+        map.FLEX = Array.prototype.slice.call(document.querySelectorAll('.ood-player__aside input[name^="pick-FLEX-"]:checked'))
+          .map(function(i){ return i.name.replace('pick-FLEX-',''); });
+      } else {
+        var sel = document.querySelector('.ood-player__aside input[type="radio"][name="pick-FLEX"]:checked');
+        map.FLEX = sel ? [sel.dataset.playerId] : [];
+      }
+      return map;
+    }
+    function updateSummaryBar(){
+      var map = getSelectedMap();
+      var chipsWrap = $('summaryChips');
+      chipsWrap.innerHTML = '';
+      var totalSel = 0;
+      function addChip(slot, pid){
+        var rec = state.playersIndex[String(pid)];
+        var name = (rec && rec.name) ? rec.name : ('Player '+pid);
+        var chip = document.createElement('button');
+        chip.type='button';
+        chip.className='chip';
+        chip.dataset.slot = slot;
+        chip.dataset.playerId = pid;
+        chip.innerHTML = '<strong>'+slot+'</strong>: '+name+' <span class="x" aria-hidden="true">×</span>';
+        chip.title = 'Remove '+name+' from '+slot;
+        chipsWrap.appendChild(chip);
+        totalSel++;
+      }
+      Object.keys(map).forEach(function(slot){
+        (map[slot] || []).forEach(function(pid){ addChip(slot, pid); });
+      });
+      var missingEl = $('summaryMissing');
+      var missingParts = [];
+      ['QB','RB','WR','TE','FLEX','K','DST'].forEach(function(slot){
+        var need = (state.caps[slot] || 0) - ((map[slot] && map[slot].length) || 0);
+        if (need > 0) missingParts.push(slot+'('+need+')');
+      });
+      if (missingParts.length){
+        missingEl.textContent = 'Missing: ' + missingParts.join(', ');
+        missingEl.hidden = false;
+      } else {
+        missingEl.hidden = true;
+      }
+      $('summaryBlock').style.display = (totalSel > 0 || missingParts.length) ? 'block' : 'none';
+    }
+    $('summaryChips').addEventListener('click', function(e){
+      var btn = e.target.closest ? e.target.closest('.chip') : null; if (!btn) return;
+      var slot = btn.dataset.slot;
+      var pid = btn.dataset.playerId;
+      var cap = state.caps[slot] || 0;
+      if (slot === 'FLEX'){
+        if ((state.caps.FLEX || 1) > 1){
+          var inp1 = document.querySelector('.ood-player__aside input[name="pick-FLEX-'+pid+'"]');
+          if (inp1) inp1.checked = false;
+        } else {
+          var inp2 = document.querySelector('.ood-player__aside input[type="radio"][name="pick-FLEX"][data-player-id="'+pid+'"]');
+          if (inp2) inp2.checked = false;
+        }
+      } else {
+        if (cap > 1){
+          var inp3 = document.querySelector('.ood-player__aside input[type="checkbox"][name="pick-'+slot+'-'+pid+'"]');
+          if (inp3) inp3.checked = false;
+        } else {
+          var inp4 = document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+slot+'"][data-player-id="'+pid+'"]');
+          if (inp4) inp4.checked = false;
+        }
+      }
+      recomputeAllCountsFromDOM();
+      updateSummaryBar();
+    });
+
+    /* ---------- Persistence ---------- */
+    function getPicksFromDOM(){
+      var picks = {};
+      ['QB','RB','WR','TE','K','DST'].forEach(function(slot){
+        var cap = state.caps[slot] || 0;
+        if (cap > 1){
+          picks[slot] = Array.prototype.slice.call(document.querySelectorAll('.ood-player__aside input[name^="pick-'+slot+'-"]:checked'))
+            .map(function(i){ return i.name.replace('pick-'+slot+'-',''); });
+        } else {
+          var sel = document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+slot+'"]:checked');
+          picks[slot] = sel ? sel.dataset.playerId : null;
+        }
+      });
+      if ((state.caps.FLEX || 1) > 1){
+        picks.FLEX = Array.prototype.slice.call(document.querySelectorAll('.ood-player__aside input[name^="pick-FLEX-"]:checked'))
+          .map(function(i){ return i.name.replace('pick-FLEX-',''); });
+      } else {
+        var sel = document.querySelector('.ood-player__aside input[type="radio"][name="pick-FLEX"]:checked');
+        picks.FLEX = sel ? [sel.dataset.playerId] : [];
+      }
+      return picks;
+    }
+
+    async function applyDbSelections(entryId){
+      var q = supa.from('one_and_done_picks').select('slot,player_id').eq('entry_id', entryId);
+      q = (state.windowId === ALL_PLAYERS_VALUE) ? q.is('window_id', null) : q.eq('window_id', state.windowId);
+      var res = await q; var data = res.data, error = res.error; if (error) { console.warn('applyDbSelections:', error); return; }
+      document.querySelectorAll('.ood-player__aside input').forEach(function(i){ i.checked=false; });
+      (data || []).forEach(function(row){
+        var cap = state.caps[row.slot] || 0;
+        if (row.slot === 'FLEX'){
+          if ((state.caps.FLEX || 1) > 1){
+            var in1 = document.querySelector('.ood-player__aside input[name="pick-FLEX-'+row.player_id+'"]');
+            if (in1 && !in1.disabled) in1.checked = true;
+          } else {
+            var in2 = document.querySelector('.ood-player__aside input[type="radio"][name="pick-FLEX"][data-player-id="'+row.player_id+'"]');
+            if (in2 && !in2.disabled) in2.checked = true;
+          }
+        } else {
+          if (cap > 1){
+            var in3 = document.querySelector('.ood-player__aside input[type="checkbox"][name="pick-'+row.slot+'-'+row.player_id+'"]');
+            if (in3 && !in3.disabled) in3.checked = true;
+          } else {
+            var in4 = document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+row.slot+'"][data-player-id="'+row.player_id+'"]');
+            if (in4 && !in4.disabled) in4.checked = true;
+          }
+        }
+      });
+      updateSummaryBar();
+    }
+
+    function applySavedSelections(){
+      var raw = getTeamParam() || 'guest';
+      var key = 'ood_lineup_' + raw + '_' + state.windowId;
+      var saved = JSON.parse(localStorage.getItem(key) || '{}'); if (!saved || !saved.picks) return;
+      document.querySelectorAll('.ood-player__aside input').forEach(function(i){ i.checked=false; });
+      ['QB','RB','WR','TE','K','DST'].forEach(function(slot){
+        var cap = state.caps[slot] || 0;
+        var val = saved.picks[slot];
+        if (cap > 1){
+          (val || []).forEach(function(pid){
+            var input = document.querySelector('.ood-player__aside input[name="pick-'+slot+'-'+pid+'"]');
+            if (input && !input.disabled) input.checked = true;
+          });
+        } else if (val){
+          var input2 = document.querySelector('.ood-player__aside input[type="radio"][name="pick-'+slot+'"][data-player-id="'+val+'"]');
+          if (input2 && !input2.disabled) input2.checked = true;
+        }
+      });
+      var flexVal = saved.picks.FLEX;
+      if ((state.caps.FLEX || 1) > 1){
+        (flexVal || []).forEach(function(pid){
+          var inp = document.querySelector('.ood-player__aside input[name="pick-FLEX-'+pid+'"]');
+          if (inp && !inp.disabled) inp.checked = true;
+        });
+      } else {
+        var pid = Array.isArray(flexVal) ? flexVal[0] : flexVal;
+        if (pid){
+          var r = document.querySelector('.ood-player__aside input[type="radio"][name="pick-FLEX"][data-player-id="'+pid+'"]');
+          if (r && !r.disabled) r.checked = true;
+        }
+      }
+      updateSummaryBar();
+    }
+
+    async function fetchExistingPicks(entryId){
+      var q = supa.from('one_and_done_picks').select('slot, player_id, window_id').eq('entry_id', entryId);
+      q = (state.windowId===ALL_PLAYERS_VALUE) ? q.is('window_id', null) : q.eq('window_id', state.windowId);
+      var res = await q; if (res.error) throw res.error; return res.data || [];
+    }
+    function playerStartedById(pid){
+      var hit = ['QB','RB','WR','TE','FLEX','K','DST']
+        .reduce(function(arr, s){ return arr.concat(state.playersBySlot[s] || []); }, [])
+        .find(function(p){ return String(p.id) === String(pid); });
+      return isPlayerStarted(hit);
+    }
+    function rowKey(r){ return r.slot + ':' + r.player_id + ':' + (r.window_id == null ? 'NULL' : r.window_id); }
+    function flattenDesired(entryId){
+      var picks = getPicksFromDOM(); var rows = [];
+      var w = (state.windowId===ALL_PLAYERS_VALUE) ? null : state.windowId;
+      var primaries = {};
+      ['QB','RB','WR','TE','K','DST'].forEach(function(slot){
+        var cap = state.caps[slot] || 0;
+        if (cap > 1){
+          (picks[slot] || []).forEach(function(pid){
+            rows.push({ entry_id: entryId, window_id: w, slot: slot, player_id: pid });
+            if (['RB','WR','TE'].indexOf(slot) >= 0) primaries[String(pid)] = true;
+          });
+        } else if (picks[slot]) {
+          rows.push({ entry_id: entryId, window_id: w, slot: slot, player_id: picks[slot] });
+          if (['RB','WR','TE'].indexOf(slot) >= 0) primaries[String(picks[slot])] = true;
+        }
+      });
+      (picks.FLEX || []).forEach(function(pid){ if (!primaries[String(pid)]) rows.push({ entry_id: entryId, window_id: w, slot:'FLEX', player_id: pid }); });
+      return rows;
+    }
+
+    async function savePicksToDb(entryId){
+      var existing = await fetchExistingPicks(entryId);
+      var desired = flattenDesired(entryId);
+      var existingSet = new Set((existing || []).map(rowKey));
+      function rk(a){ return a.slot + ':' + a.player_id + ':' + (a.window_id == null ? 'NULL' : a.window_id); }
+      var desiredSet = new Set((desired || []).map(function(r){ return rk({slot:r.slot, player_id:r.player_id, window_id:r.window_id}); }));
+      var toRemove = (existing || []).filter(function(r){
+        var started = playerStartedById(r.player_id);
+        var keep = started || desiredSet.has(rowKey(r));
+        return !keep;
+      });
+      var toAdd = (desired || []).filter(function(r){
+        var started = playerStartedById(r.player_id);
+        var exists = existingSet.has(rk({slot:r.slot, player_id:r.player_id, window_id:r.window_id}));
+        return !started && !exists;
+      });
+      for (var i=0;i<toRemove.length;i++){
+        var r = toRemove[i];
+        var del = supa.from('one_and_done_picks').delete().eq('entry_id', entryId).eq('slot', r.slot).eq('player_id', r.player_id);
+        del = (state.windowId===ALL_PLAYERS_VALUE) ? del.is('window_id', null) : del.eq('window_id', state.windowId);
+        var res = await del; if (res.error) throw res.error;
+      }
+      if (toAdd.length){
+        var ins = await supa.from('one_and_done_picks').insert(toAdd);
+        if (ins.error) throw ins.error;
+      }
+    }
+
+    async function applySavedOrDbPicks(){
+      var entry = await resolveEntryIdFromUrl({ createIfMissing: true });
+      if (entry){ try { await applyDbSelections(entry); } catch(e){} }
+      else { applySavedSelections(); }
+    }
+
+    /* ---------- Resolve entry/team ---------- */
+    async function resolveEntryIdFromUrl(opts){
+      opts = opts || {}; var createIfMissing = !!opts.createIfMissing;
+      var entryFromUrl = getEntryParam();
+      var teamFromUrl = getTeamParam();
+
+      if (entryFromUrl){
+        try{
+          var q1 = await supa.from('lineup_entries').select('id').eq('id', entryFromUrl).limit(1).maybeSingle();
+          if (!q1.error && q1.data && q1.data.id){ state.resolverNote = 'entry_id found in URL'; return q1.data.id; }
+        }catch(e){}
+      }
+
+      if (teamFromUrl){
+        var orders = [['inserted_at', false], ['id', false], [null, null]];
+        for (var i=0;i<orders.length;i++){
+          var col = orders[i][0], asc = orders[i][1];
+          try{
+            var q = supa.from('lineup_entries').select('id').eq('team_id', teamFromUrl).limit(1);
+            if (col) q = q.order(col, { ascending: asc });
+            var res = await q;
+            if (!res.error && Array.isArray(res.data) && res.data.length){
+              state.resolverNote = 'existing entry found for team';
+              return res.data[0].id;
+            }
+          }catch(e){}
+        }
+
+        if (createIfMissing){
+          try{
+            // Get pool id for the One & Done pool code
+            var poolId = null;
+            try {
+              var poolRes = await supa.from('pools').select('id, code').eq('code', 'one-and-done').single();
+              if (!poolRes.error) poolId = (poolRes.data && poolRes.data.id) ? poolRes.data.id : null;
+            } catch (e) { console.warn('[resolver] pools lookup threw:', e); }
+
+            var payload = poolId ? { team_id: teamFromUrl, pool_id: poolId, position: 'FLEX' }
+                                 : { team_id: teamFromUrl, position: 'FLEX' };
+            var ins = await supa.from('lineup_entries').insert(payload).select('id').single();
+            if (!ins.error && ins.data && ins.data.id){
+              state.resolverNote = 'created new lineup_entries row';
+              showSummaryToast('Created lineup entry for this team', 'ok', 1600);
+              return ins.data.id;
+            }
+            console.warn('lineup_entries insert failed:', ins.error);
+            state.resolverNote = 'create failed: ' + (ins.error ? ins.error.message : 'unknown error');
+            showSummaryToast('Could not create lineup entry (permission or team not found). Open from Teams page.', 'warn', 2600);
+            return null;
+          }catch(e){
+            console.error('lineup_entries insert threw:', e);
+            state.resolverNote = 'create threw: ' + (e && e.message ? e.message : e);
+            showSummaryToast('Could not create lineup entry. Open from Teams page.', 'warn', 2600);
+            return null;
+          }
+        }
+      }
+
+      state.resolverNote = 'no entry/team in URL';
+      return null;
+    }
+
+    /* ---------- Events ---------- */
+    $('filterInput').addEventListener('input', function(){ renderAllPlayers(); updateSummaryBar(); });
+    $('refreshBtn').addEventListener('click', async function(){ await loadPlayers(); renderAllPlayers(); });
+    $('clearAllBtn').addEventListener('click', handleClearAll);
+    $('windowSelect') && $('windowSelect').addEventListener('change', async function(){
+      state.windowId = $('windowSelect').value;
+      var w = (state.windows.find ? (state.windows.find(function(x){ return String(x.id)===String(state.windowId); }) || {}).label : null) || 'Window';
+      $('windowChip').textContent = (state.windowId === ALL_PLAYERS_VALUE) ? 'All Players' : w;
+      await loadPlayers();
+      var entry = await resolveEntryIdFromUrl({ createIfMissing: true });
+      if (entry) await loadUsedPlayers(entry);
+      updateLockedChip();
+      renderAllPlayers();
+    });
+
+    $('saveBtn').addEventListener('click', async function(){
+      var entry = await resolveEntryIdFromUrl({ createIfMissing: true });
+      if (entry){
+        try {
+          await savePicksToDb(entry);
+          await loadUsedPlayers(entry);
+          await applyDbSelections(entry);
+          recomputeAllCountsFromDOM();
+          updateSummaryBar();
+          showToast('Lineup saved to Supabase.', 'ok', 1600);
+          try {
+            var optedIn = document.getElementById('emailOptIn') && document.getElementById('emailOptIn').checked;
+            if (optedIn && typeof window.sendPickEmail === 'function') await window.sendPickEmail(entry);
+          } catch (e) {}
+        } catch (e) {
+          console.error('Save error:', e);
+          showToast('Save failed: ' + (e && e.message ? e.message : 'Check console.'), 'error', 3000);
+        }
+      } else {
+        var rawKey = getTeamParam() || 'guest';
+        var key = 'ood_lineup_' + rawKey + '_' + state.windowId;
+        localStorage.setItem(key, JSON.stringify({ saved_at:new Date().toISOString(), picks:getPicksFromDOM() }));
+        applySavedSelections(); recomputeAllCountsFromDOM(); updateSummaryBar();
+        showToast('Lineup saved locally (no entry id in URL).', 'warn', 2000);
+        if (state.resolverNote) console.log('[resolver]', state.resolverNote);
+      }
+    });
+
+    $('logoutBtn').addEventListener('click', function(){ goLogout(); });
+
+    /* ---------- Bootstrap ---------- */
+    (async function main(){
+      try {
+        await ensureAuth();
+        var nameHint = getTeamNameHint();
+        document.getElementById('teamHeading').textContent = nameHint ? decodeURIComponent(nameHint) + ' — Lineup' : 'Your Lineup';
+        await loadRosterSettings();
+        await loadWindows();
+        renderSlots();
+        await loadPlayers();
+        var entry = await resolveEntryIdFromUrl({ createIfMissing: true });
+        if (entry) await loadUsedPlayers(entry);
+        renderAllPlayers();
+
+        try {
+          var pref = await (async function(){
+            var uid = await getUserId(); if (!uid) return true;
+            var r = await supa.from('profile_preferences').select('email_picks_opt_in').eq('user_id', uid).maybeSingle();
+            if (r.error) return true;
+            return (r.data && r.data.email_picks_opt_in !== false);
+          })();
+          var toggle = document.getElementById('emailOptIn');
+          if (toggle) toggle.checked = !!pref;
+          toggle && toggle.addEventListener('change', async function(e){
+            var uid = await getUserId(); if (!uid) return;
+            await supa.from('profile_preferences').upsert({
+              user_id: uid,
+              email_picks_opt_in: !!e.target.checked,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+          });
+        } catch (e) {}
+
+      } catch (e) {
+        console.error('Init failed:', e);
+        showToast((e && e.message) ? e.message : 'Failed to load lineup.', 'error', 3000);
+      }
+    })();
+  </script>
+</body>
+</html>
+``

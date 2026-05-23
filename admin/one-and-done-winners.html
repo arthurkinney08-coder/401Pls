@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DFP — Admin • One & Done Winners</title>
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" href="../logo.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../styles/buttons.css" />
+
+  <style>
+    .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .metrics{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+
+    /* Token chips */
+    .tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .token{
+      display:inline-flex;align-items:center;gap:6px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:.95rem;
+    }
+    .token .label{color:var(--muted)}
+    .token .value{font-weight:600}
+    .token.total{
+      background:rgba(45,108,223,0.10);
+      border-color:rgba(45,108,223,0.35);
+    }
+
+    /* Table (grid-like) */
+    .table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .table thead th {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 1;
+      text-align: left;
+    }
+    .table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+    .col-rank { width: 80px; text-align:left; }
+    .col-team { text-align:left; }
+    .col-points,.col-award { text-align:right; font-variant-numeric: tabular-nums; }
+
+    /* Summary row */
+    .summary { margin-top: 8px; color: var(--muted); font-size: .92rem; }
+
+    /* Toolbar */
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+    /* Mobile tweaks */
+    @media (max-width: 700px) {
+      .table thead th, .table tbody td { padding: 8px 10px; }
+      .col-rank{width:60px}
+    }
+  </style>
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logo.png" class="logo--small" alt="DFP" />
+      <h1>Admin • One &amp; Done Winners</h1>
+    </div>
+    <!-- NAV: quiet gray pills -->
+    <div class="actions header-actions">
+ <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Overview</a>     
+ <a class="btn btn--quiet btn--sm" href="./admin.html">Admin Home</a>
+      <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
+      <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:1100px;">
+    <!-- Prize & PNTS context -->
+    <section class="card">
+      <div class="metrics">
+        <div>
+          <h3 style="margin:0 0 6px 0;">Prize Context</h3>
+          <div class="tokens" id="context-tokens"></div>
+          <div class="tokens" style="margin-top:6px" id="split-tokens"></div>
+        </div>
+        <div class="toolbar">
+          <!-- Export button uses ghost/blue -->
+          <button class="btn btn--ghost btn--sm" id="export-csv">Export CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Winners (computed on the fly) -->
+    <section class="card">
+      <h3 style="margin:0 0 6px 0;">Computed Winners (live from leaderboard)</h3>
+      <div id="lb-empty" class="muted" hidden>No teams yet.</div>
+      <div style="overflow-x:auto;">
+        <table class="table" id="winners">
+          <thead>
+            <tr>
+              <th class="col-rank">Place</th>
+              <th class="col-team">Team</th>
+              <th class="col-points">Fantasy Points</th>
+              <th class="col-award">Award (PNTS)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="summary" id="summary-line"></div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+
+  <script>
+    (async () => {
+      // Robust logout
+      const lo = document.getElementById('logout-btn');
+      if (lo) {
+        lo.addEventListener('click', async () => {
+          try {
+            if (typeof doLogout === 'function') { await doLogout(); return; }
+          } catch (e) {
+            console.warn('doLogout failed; fallback', e);
+          }
+          window.location.href = '../index.html';
+        });
+      }
+
+      // Admin gate (non-block if missing)
+      try { if (typeof requireAdmin === 'function') await requireAdmin(); } catch (_) {}
+
+      const pool = 'one-and-done';
+      const fmtInt = (n)=> Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+      const fmt2  = (n)=> Number(n ?? 0).toFixed(2);
+
+      // 1) Prize context (entries, entry PNTS, total PNTS) + split
+      let entries=0, entryPNTS=0, totalPNTS=0;
+      let split = { p1:70, p2:25, p3:5 };
+
+      try {
+        const { data: pr } = await sb
+          .from('v_pool_pnts_running')
+          .select('team_count, entry_pnts, running_pnts_total')
+          .eq('pool_type', pool)
+          .maybeSingle();
+        entries   = pr?.team_count ?? 0;
+        entryPNTS = pr?.entry_pnts ?? 0;
+        totalPNTS = pr?.running_pnts_total ?? 0;
+      } catch (e) { console.warn('pnts view error', e); }
+
+      try {
+        const { data: ps } = await sb
+          .from('pool_settings')
+          .select('prize_pct_1, prize_pct_2, prize_pct_3')
+          .eq('pool_type', pool)
+          .maybeSingle();
+        if (ps) {
+          split.p1 = Number(ps.prize_pct_1 ?? 70);
+          split.p2 = Number(ps.prize_pct_2 ?? 25);
+          split.p3 = Number(ps.prize_pct_3 ?? 5);
+        }
+      } catch (e) { console.warn('settings load error', e); }
+
+      // Render tokens
+      const ctx = document.getElementById('context-tokens');
+      ctx.innerHTML = `
+        <span class="token"><span class="label">Entries</span> <span class="value">${fmtInt(entries)}</span></span>
+        <span class="token"><span class="label">PNTS/Entry</span> <span class="value">${fmtInt(entryPNTS)}</span></span>
+        <span class="token total"><span class="label">Total PNTS</span> <span class="value">${fmtInt(totalPNTS)}</span></span>
+      `;
+
+      const p1 = Math.floor(totalPNTS * (split.p1/100));
+      const p2 = Math.floor(totalPNTS * (split.p2/100));
+      const p3 = Math.max(0, totalPNTS - p1 - p2);
+
+      const st = document.getElementById('split-tokens');
+      st.innerHTML = `
+        <span class="token"><span class="label">1st %</span> <span class="value">${split.p1}%</span></span>
+        <span class="token"><span class="label">2nd %</span> <span class="value">${split.p2}%</span></span>
+        <span class="token"><span class="label">3rd %</span> <span class="value">${split.p3}%</span></span>
+        <span class="token"><span class="label">1st PNTS</span> <span class="value">${fmtInt(p1)}</span></span>
+        <span class="token"><span class="label">2nd PNTS</span> <span class="value">${fmtInt(p2)}</span></span>
+        <span class="token total"><span class="label">3rd PNTS</span> <span class="value">${fmtInt(p3)}</span></span>
+      `;
+
+      // 2) Pull standings
+      const { data: rows, error } = await sb
+        .from('v_od_leaderboard')
+        .select('team_id, team_name, total_points')
+        .order('total_points', { ascending: false });
+
+      const tbody  = document.querySelector('#winners tbody');
+      const empty  = document.getElementById('lb-empty');
+      const summary= document.getElementById('summary-line');
+
+      if (error || !rows || !rows.length) {
+        if (empty) empty.hidden = false;
+        summary.textContent = '';
+        return;
+      }
+      if (empty) empty.hidden = true;
+
+      // 3) Compute payouts with tie pooling across 1/2/3 buckets
+      const buckets = [p1, p2, p3]; // indices 0..2
+      const groups = [];
+      let i = 0;
+      while (i < rows.length) {
+        const pts = rows[i].total_points;
+        const group = [];
+        let j = i;
+        while (j < rows.length && rows[j].total_points === pts) { group.push(rows[j]); j++; }
+        groups.push(group);
+        i = j;
+      }
+
+      let placeIndex = 0; // 0-based into buckets
+      const result = [];  // { placeLabel, team, pts, award }
+      for (const group of groups) {
+        const m = group.length;
+        const start = placeIndex;
+        const end = Math.min(2, start + m - 1);
+        if (start > 2) {
+          for (const t of group) {
+            result.push({ placeLabel: `${start+1}${ordinal(start+1)} (no award)`, team: t.team_name, pts: t.total_points, award: 0 });
+          }
+          continue;
+        }
+        let pooled = 0;
+        for (let k = start; k <= end; k++) pooled += (buckets[k] || 0);
+        const each = Math.floor(pooled / m);
+        for (const t of group) {
+          const placeNum = start + 1;
+          result.push({ placeLabel: `${placeNum}${ordinal(placeNum)}`, team: t.team_name, pts: t.total_points, award: each });
+        }
+        placeIndex = end + 1;
+        if (placeIndex > 2) break;
+      }
+
+      // Render table
+      tbody.innerHTML = '';
+      for (const r of result) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="col-rank">${r.placeLabel}</td>
+          <td class="col-team">${escapeHtml(r.team)}</td>
+          <td class="col-points">${fmt2(r.pts)}</td>
+          <td class="col-award">${fmtInt(r.award)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      const totalAwarded = result.reduce((a,b)=> a + (b.award || 0), 0);
+      summary.textContent = `Awarded PNTS: ${fmtInt(totalAwarded)} of ${fmtInt(totalPNTS)} total (remainder kept for rounding or unused buckets).`;
+
+      // Export CSV
+      document.getElementById('export-csv').onclick = () => {
+        const csv = toCSV([
+          ['Place','Team','Fantasy Points','Award PNTS'],
+          ...result.map(r => [r.placeLabel, r.team, String(r.pts), String(r.award)])
+        ]);
+        downloadFile(csv, 'one_and_done_winners.csv', 'text/csv');
+      };
+
+      // Utils
+      function ordinal(n){
+        const v = n % 100;
+        if (v >= 11 && v <= 13) return 'th';
+        switch (n % 10){ case 1:return 'st'; case 2:return 'nd'; case 3:return 'rd'; default:return 'th'; }
+      }
+      function escapeHtml(s){
+        return (s ?? '').replace(/[&\<\>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"\'":"'"}[c]));
+      }
+      function toCSV(rows){
+        return rows.map(r => r.map(cell => {
+          const v = (cell ?? '').toString();
+          return /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v;
+        }).join(',')).join('\n');
+      }
+      function downloadFile(content, filename, mime){
+        const blob = new Blob([content], { type: mime });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+    })();
+  </script>
+</body>
+</html>
