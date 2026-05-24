@@ -155,7 +155,14 @@
 
   // ── Sleeper Sync ──────────────────────────────────────────
   async function syncFromSleeper() {
-    btnSync.disabled = true;
+   // Valid current NFL teams only (excludes FA, retired, etc)
+    const NFL_TEAMS = new Set([
+      'ARI','ATL','BAL','BUF','CAR','CHI','CIN','CLE',
+      'DAL','DEN','DET','GB','HOU','IND','JAX','KC',
+      'LAC','LAR','LV','MIA','MIN','NE','NO','NYG',
+      'NYJ','PHI','PIT','SF','SEA','TB','TEN','WAS'
+    ]);
+
     btnSync.textContent = "Syncing...";
 
     try {
@@ -164,15 +171,39 @@
       const all = await res.json();
 
       // Filter to only active skill position players
-      const POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
-      const active = Object.values(all).filter(p =>
-        p.active &&
-        p.full_name &&
-        POSITIONS.includes(p.position) &&
-        p.team // must be on a team
-      );
+const POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
-      // Upsert into Supabase in batches of 100
+// Get all active players in right positions on a team
+const allActive = Object.values(all).filter(p =>
+  p.active &&
+  p.full_name &&
+  p.team &&
+  POSITIONS.includes(p.position)
+);
+
+// Strict per-team limits
+const limits = { QB: 1, RB: 2, WR: 3, TE: 2, K: 1, DEF: 1 };
+const teamPositionCount = {};
+const active = [];
+
+// Sort by depth chart order first so we get the best players
+allActive.sort((a, b) => 
+  (a.depth_chart_order || 99) - (b.depth_chart_order || 99)
+);
+
+for (const p of allActive) {
+  const pos = p.position;
+  const key = `${p.team}_${pos}`;
+  const count = teamPositionCount[key] || 0;
+  const limit = limits[pos] || 2;
+  
+  if (count < limit) {
+    teamPositionCount[key] = count + 1;
+    active.push(p);
+  }
+}
+
+// Upsert into Supabase in batches of 100
       let count = 0;
       const BATCH = 100;
       for (let i = 0; i < active.length; i += BATCH) {
