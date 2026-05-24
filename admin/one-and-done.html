@@ -177,6 +177,24 @@
         </div>
       </div>
     </section>
+  <!-- Live Scoring -->
+    <section class="card" style="margin-top:16px;">
+      <h3 style="margin:0 0 8px">Live Scoring</h3>
+      <p class="muted">Fetch latest stats from Sleeper and update player points. Run this during games for live scoring.</p>
+      
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+        <select id="season-type" class="input" style="width:140px;">
+          <option value="pre">Preseason</option>
+          <option value="regular" selected>Regular Season</option>
+          <option value="post">Playoffs</option>
+        </select>
+        <input id="season-year" type="number" class="input" value="2025" style="width:100px;" placeholder="Year"/>
+        <input id="season-week" type="number" class="input" value="1" style="width:80px;" placeholder="Week"/>
+        <button class="btn btn--ghost btn--sm" id="sync-scores-btn">Sync Live Scores</button>
+        <span id="sync-scores-msg" class="muted"></span>
+      </div>
+    </section>
+
   </main>
 
   <!-- Scripts -->
@@ -456,6 +474,34 @@
         setTimeout(()=> el.pctMsg.textContent = '', 1200);
         el.pctSave.disabled = false;
       };
+    })();
+  </script>
+<script src="../js/scoring-engine.js"></script>
+  <script>
+    (async () => {
+      const btn = document.getElementById('sync-scores-btn');
+      const msg = document.getElementById('sync-scores-msg');
+
+      btn.addEventListener('click', async () => {
+        const seasonType = document.getElementById('season-type').value;
+        const season = document.getElementById('season-year').value;
+        const week = document.getElementById('season-week').value;
+
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        msg.textContent = '';
+
+        try {
+          const count = await window.ScoringEngine.syncLiveScores(seasonType, season, week);
+          msg.textContent = `✅ Updated ${count} players`;
+        } catch (e) {
+          msg.textContent = '❌ Failed: ' + e.message;
+          console.error(e);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Sync Live Scores';
+        }
+      });
     })();
   </script>
 </body>
