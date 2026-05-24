@@ -215,5 +215,50 @@ const POOLS = [
       </ul>
     `
   },
+
+{
+    id: 'nhl-one-and-done',
+    sport: 'hockey',
+    title: 'One & Done (NHL Playoffs)',
+    desc: 'Pick NHL players each round — once used, they\'re gone forever.',
+    href: 'pools/nhl-one-and-done.html',
+    rulesHtml: `
+      <h3>⚡️ QUICK RULES — FAST & OFFICIAL ⚡️</h3>
+      <p><strong>Entry:</strong> Activate your spot with <strong>110 PNTS</strong>.</p>
+      <p><strong>Email:</strong> Your signup email is your PNTS hub for all transfers and updates.</p>
+      <p><strong>Running PNT Total:</strong> Every entry adds 100 PNT to the collective tracker. More teams = bigger total = bigger hype.</p>
+      <p><strong>PNT Use:</strong> All PNT movement is strictly for pool scoring, standings, and internal rewards.</p>
+      <p><strong>Vibes:</strong> Ride the hot goalie. Trust the grind. Playoff hockey hits different.</p>
+      <hr style="border-color:#2a2d33;margin:12px 0"/>
+      <h3>🏒 NHL ONE & DONE FORMAT</h3>
+      <p>Build the highest scoring lineup across the NHL playoffs — but once you use a player, they're gone forever.</p>
+      <h4>🔧 Lineup Per Round</h4>
+      <ul>
+        <li>2 Centers</li>
+        <li>2 Left Wings</li>
+        <li>2 Right Wings</li>
+        <li>2 Defensemen</li>
+        <li>1 Goalie</li>
+      </ul>
+      <h4>📊 Scoring</h4>
+      <ul>
+        <li>Goal = 2 pts</li>
+        <li>Assist = 1 pt</li>
+        <li>Goalie Win = 2 pts</li>
+        <li>Goalie Shutout = 3 pts</li>
+        <li>Goals Against = -0.5 pts</li>
+      </ul>
+      <h4>🚫 One‑and‑Done Rule</h4>
+      <p>Each NHL player can only be used <strong>once</strong> during the entire playoffs.</p>
+      <p><em>Example:</em> If you use McDavid in Round 1, he's locked out for the rest of the pool.</p>
+      <h4>🧠 Strategy Tips</h4>
+      <ul>
+        <li><strong>Save your stars:</strong> Don't burn McDavid or MacKinnon in Round 1.</li>
+        <li><strong>Watch the matchups:</strong> Target weak defensive teams.</li>
+        <li><strong>Goalie is key:</strong> A hot goalie in a deep run is gold.</li>
+        <li><strong>Track eliminations:</strong> If a team gets swept, those players are worthless next round.</li>
+      </ul>
+ `
+  },
 ];
 export default POOLS;
