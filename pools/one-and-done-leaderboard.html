@@ -263,7 +263,7 @@
       setAwards(totalPNTS, split.p1, split.p2, split.p3);
 
       /* ====== Four fixed rounds ====== */
-      const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl'];
+     const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl'];
       const ROUND_SET = new Set(ROUND_ORDER);
 
       /* ====== Fixed position order ====== */
@@ -292,25 +292,35 @@
         return placeholders;
       }
 
-      async function fetchTeamStartedByRound(teamId) {
+   async function fetchTeamStartedByRound(teamId) {
         const { data, error } = await sb
           .from('v_od_team_lineups_started')
-          .select('window_label, players')
+          .select('window_label, player_name, position, team_abbr, points, slot, has_started')
           .eq('team_id', teamId);
+        
         if (error) {
           console.warn('v_od_team_lineups_started error', error);
           return {};
         }
+
         const map = {};
         (data || []).forEach(r => {
-          const lbl = r.window_label || '';
+          const lbl = r.window_label || 'Current Picks';
           if (!ROUND_SET.has(lbl)) return;
-          map[lbl] = r.players || [];
+          if (!map[lbl]) map[lbl] = [];
+          map[lbl].push({
+            player_name: r.player_name,
+            position: r.position,
+            team_abbr: r.team_abbr,
+            points: r.points,
+            slot: r.slot,
+            has_started: r.has_started
+          });
         });
         return map;
       }
 
-      function renderDetailGrid(container, byRound, positionPlaceholders) {
+  async function renderDetailGrid(container, byRound, positionPlaceholders) {
         container.innerHTML = '';
         const grid = document.createElement('div');
         grid.className = 'round-grid';
@@ -328,14 +338,14 @@
               row.className = 'player-row';
               const left = document.createElement('div');
               left.className = 'muted';
-              left.textContent = `${pos} — (no started selection)`;
+              left.textContent = `${pos} — (no selection)`;
               row.append(left, document.createElement('div'));
               col.appendChild(row);
             });
           } else {
             const sorted = [...players].sort((a, b) => {
-              const A = String(a.position || '').toUpperCase();
-              const B = String(b.position || '').toUpperCase();
+              const A = String(a.slot || a.position || '').toUpperCase();
+              const B = String(b.slot || b.position || '').toUpperCase();
               const ia = POS_INDEX[A] ?? 999, ib = POS_INDEX[B] ?? 999;
               if (ia !== ib) return ia - ib;
               return String(a.player_name || '').localeCompare(String(b.player_name || ''));
@@ -344,12 +354,13 @@
               const row = document.createElement('div');
               row.className = 'player-row';
               const left = document.createElement('div');
-              const pos = String(p.position || '').toUpperCase();
-              const posLabel = pos ? `${pos} — ` : '';
+              const slotLabel = String(p.slot || p.position || '').toUpperCase();
+              const posLabel = slotLabel ? `${slotLabel} — ` : '';
               left.textContent = `${posLabel}${p.player_name}${p.team_abbr ? ` · ${p.team_abbr}` : ''}`;
               const right = document.createElement('div');
               right.className = 'muted';
-              right.textContent = 'started';
+              const pts = Number(p.points || 0);
+              right.textContent = pts > 0 ? `${pts.toFixed(2)} pts` : '—';
               row.append(left, right);
               col.appendChild(row);
             });
@@ -358,7 +369,6 @@
         });
         container.appendChild(grid);
       }
-
       async function toggleDetail(mainTr, btn, team) {
         const detailTr = mainTr.nextElementSibling;
         const expanded = btn.getAttribute('aria-expanded') === 'true';
