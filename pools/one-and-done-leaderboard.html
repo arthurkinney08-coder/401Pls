@@ -263,7 +263,7 @@
       setAwards(totalPNTS, split.p1, split.p2, split.p3);
 
       /* ====== Four fixed rounds ====== */
-     const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl'];
+     const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl','Current Picks'];
       const ROUND_SET = new Set(ROUND_ORDER);
 
       /* ====== Fixed position order ====== */
@@ -306,7 +306,7 @@
         const map = {};
         (data || []).forEach(r => {
           const lbl = r.window_label || 'Current Picks';
-          if (!ROUND_SET.has(lbl)) return;
+       // allow all labels through including 'Current Picks'
           if (!map[lbl]) map[lbl] = [];
           map[lbl].push({
             player_name: r.player_name,
