@@ -12,7 +12,6 @@
 
   <style>
     .header-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    /* ---- PNTS tokens ---- */
     .pnts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .pnts-tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .token{
@@ -30,7 +29,6 @@
       border-color:rgba(220,53,69,0.45);
       color:#ffd7db;
     }
-    /* ---- Award tokens (stacked preview) ---- */
     .awards{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
     .token.vert{
       border-radius:12px;
@@ -57,14 +55,13 @@
       border-color:rgba(192,138,90,0.55);
       color:#ffdfc7;
     }
-    /* ---- Leaderboard Table ---- */
     .table {
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
       border: 1px solid var(--border);
       border-radius: 10px;
-      overflow: hidden; /* rounded zebra rows */
+      overflow: hidden;
     }
     .table thead th {
       background: rgba(255,255,255,0.04);
@@ -72,7 +69,7 @@
       font-weight: 600;
       padding: 10px 12px;
       border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 1; /* sticky header */
+      position: sticky; top: 0; z-index: 1;
       text-align:left;
     }
     .table tbody td {
@@ -80,7 +77,6 @@
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
-    /* Remove highlight/hover/selection */
     .table tbody tr:hover td { background: transparent !important; }
     .table tbody tr:focus td { outline: none !important; }
     .table tbody tr.is-selected td { background: transparent !important; box-shadow:none !important; }
@@ -95,8 +91,8 @@
     @media (max-width: 700px) {
       .table thead th, .table tbody td { padding: 8px 10px; }
       .token.vert{min-width:120px}
+      .round-grid { grid-template-columns: 1fr !important; }
     }
-    /* Expander */
     .expander-btn {
       width: 26px; height: 26px; border-radius: 6px;
       display: grid; place-items: center; border: 1px solid #444;
@@ -107,8 +103,13 @@
     .round-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; }
     .round-col { border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px; }
     .round-title { font-weight: 700; font-size: 13px; color: #dfe3ea; margin: 0 0 8px 0; }
-    .player-row { display:flex; justify-content:space-between; gap:8px; border-bottom: 1px dashed #2a2a2a; padding:4px 0; }
+    .player-row { display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom: 1px dashed #2a2a2a; padding:6px 0; }
     .player-row:last-child { border-bottom: 0; }
+    .player-row .pos-tag { font-weight:700; font-size:.72rem; color:#3b82f6; min-width:32px; flex-shrink:0; }
+    .player-row .name-group { display:flex; align-items:baseline; gap:5px; flex:1; min-width:0; }
+    .player-row .player-name { font-weight:500; font-size:.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .player-row .team-tag { color:#9aa9b2; font-size:.74rem; flex-shrink:0; }
+    .player-row .pts { font-variant-numeric:tabular-nums; white-space:nowrap; font-size:.85rem; color:#9aa9b2; flex-shrink:0; }
     .muted { color: #9aa9b2; }
   </style>
 </head>
@@ -118,18 +119,15 @@
       <img src="../logo.png" alt="DFP" class="logo--small"/>
       <h1>One &amp; Done • Leaderboard</h1>
     </div>
-    <!-- NAV: all quiet/gray -->
     <div class="actions header-actions">
-    <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Team Page</a>
+      <a class="btn btn--quiet btn--sm" href="./one-and-done.html">Team Page</a>
       <a class="btn btn--quiet btn--sm" href="./one-and-done-winners.html">Winners Circle</a>
       <a class="btn btn--quiet btn--sm" href="../dashboard.html">Back to Pools</a>
-  
       <button class="btn btn--quiet btn--sm" id="logout-btn">Logout</button>
     </div>
   </header>
 
   <main class="container" style="max-width:1100px;">
-    <!-- Running PNTS -->
     <section class="card">
       <div class="pnts-row">
         <div>
@@ -140,7 +138,6 @@
       </div>
     </section>
 
-    <!-- Awards preview -->
     <section class="card">
       <h3 style="margin:0 0 6px 0;">Awards</h3>
       <div class="awards">
@@ -159,7 +156,6 @@
       </div>
     </section>
 
-    <!-- Leaderboard -->
     <section class="card">
       <h3 class="centered" id="lb-title">Fantasy Points Leaderboard</h3>
       <div id="lb-empty" class="muted" hidden>No teams yet.</div>
@@ -178,7 +174,6 @@
     </section>
   </main>
 
-  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/config.js"></script>
   <script src="../js/supabase.js"></script>
@@ -199,19 +194,16 @@
         const a1 = Math.floor(T * (Number(p1)/100));
         const a2 = Math.floor(T * (Number(p2)/100));
         const a3 = Math.max(0, T - a1 - a2);
-        const el1 = document.getElementById('award-1st');
-        const el2 = document.getElementById('award-2nd');
-        const el3 = document.getElementById('award-3rd');
-        if (el1) el1.textContent = fmtInt(a1);
-        if (el2) el2.textContent = fmtInt(a2);
-        if (el3) el3.textContent = fmtInt(a3);
+        document.getElementById('award-1st').textContent = fmtInt(a1);
+        document.getElementById('award-2nd').textContent = fmtInt(a2);
+        document.getElementById('award-3rd').textContent = fmtInt(a3);
       }
 
       function escapeHtml(s){
-        return (s ?? '').replace(/[&\<\>\\\"']/g, c => ({'&':'&','<':'<','>':'>','"':'"','\'':'\''}[c]));
+        return (s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
       }
 
-      // 1) Read is_final and prize split
+      // 1) Pool settings
       let split = { p1:70, p2:25, p3:5 };
       try {
         const titleEl = document.getElementById('lb-title');
@@ -230,11 +222,9 @@
           p2: Number(ps?.prize_pct_2 ?? 25),
           p3: Number(ps?.prize_pct_3 ?? 5),
         };
-      } catch (e) {
-        console.warn('settings read error', e);
-      }
+      } catch (e) { console.warn('settings read error', e); }
 
-      // 2) Running PNTS tokens
+      // 2) Running PNTS
       let entries=0, entryPNTS=0, totalPNTS=0;
       try {
         const { data: pr } = await sb
@@ -259,14 +249,11 @@
         if (tokens) tokens.innerHTML = `<span class="token total-red"><span class="value">PNTS unavailable</span></span>`;
       }
 
-      // Awards preview
       setAwards(totalPNTS, split.p1, split.p2, split.p3);
 
-      /* ====== Four fixed rounds ====== */
-     const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl','Current Picks'];
+      const ROUND_ORDER = ['Wild Card Round','Divisional Round','Conference Championship','Super Bowl'];
       const ROUND_SET = new Set(ROUND_ORDER);
 
-      /* ====== Fixed position order ====== */
       const POS_ORDER = ['QB','RB','WR','TE','FLEX','K','DST'];
       const POS_INDEX = Object.fromEntries(POS_ORDER.map((p, i) => [p, i]));
 
@@ -292,12 +279,12 @@
         return placeholders;
       }
 
-   async function fetchTeamStartedByRound(teamId) {
+      async function fetchTeamStartedByRound(teamId) {
         const { data, error } = await sb
           .from('v_od_team_lineups_started')
           .select('window_label, player_name, position, team_abbr, points, slot, has_started')
           .eq('team_id', teamId);
-        
+
         if (error) {
           console.warn('v_od_team_lineups_started error', error);
           return {};
@@ -306,7 +293,6 @@
         const map = {};
         (data || []).forEach(r => {
           const lbl = r.window_label || 'Current Picks';
-       // allow all labels through including 'Current Picks'
           if (!map[lbl]) map[lbl] = [];
           map[lbl].push({
             player_name: r.player_name,
@@ -320,10 +306,11 @@
         return map;
       }
 
-  async function renderDetailGrid(container, byRound, positionPlaceholders) {
+      function renderDetailGrid(container, byRound, positionPlaceholders) {
         container.innerHTML = '';
         const grid = document.createElement('div');
         grid.className = 'round-grid';
+
         ROUND_ORDER.forEach(lbl => {
           const col = document.createElement('div');
           col.className = 'round-col';
@@ -331,15 +318,18 @@
           h.className = 'round-title';
           h.textContent = lbl;
           col.appendChild(h);
+
           const players = byRound[lbl] || [];
+
           if (!players.length) {
+            // No picks at all for this round
             positionPlaceholders.forEach(pos => {
               const row = document.createElement('div');
               row.className = 'player-row';
-              const left = document.createElement('div');
-              left.className = 'muted';
-              left.textContent = `${pos} — (no selection)`;
-              row.append(left, document.createElement('div'));
+              row.innerHTML = `
+                <span class="pos-tag">${pos}</span>
+                <span class="name-group"><span class="player-name muted">No selection</span></span>
+                <span class="pts">—</span>`;
               col.appendChild(row);
             });
           } else {
@@ -350,25 +340,38 @@
               if (ia !== ib) return ia - ib;
               return String(a.player_name || '').localeCompare(String(b.player_name || ''));
             });
+
             sorted.forEach(p => {
               const row = document.createElement('div');
               row.className = 'player-row';
-              const left = document.createElement('div');
               const slotLabel = String(p.slot || p.position || '').toUpperCase();
-              const posLabel = slotLabel ? `${slotLabel} — ` : '';
-              left.textContent = `${posLabel}${p.player_name}${p.team_abbr ? ` · ${p.team_abbr}` : ''}`;
-              const right = document.createElement('div');
-              right.className = 'muted';
               const pts = Number(p.points || 0);
-              right.textContent = pts > 0 ? `${pts.toFixed(2)} pts` : '—';
-              row.append(left, right);
+
+              if (!p.has_started) {
+                // Pick exists but game hasn't started — hide the player name
+                row.innerHTML = `
+                  <span class="pos-tag">${slotLabel}</span>
+                  <span class="name-group"><span class="player-name muted">Game not started</span></span>
+                  <span class="pts">—</span>`;
+              } else {
+                // Game has started — show full row (name + team grouped together)
+                const teamBit = p.team_abbr ? `<span class="team-tag">· ${escapeHtml(p.team_abbr)}</span>` : '';
+                row.innerHTML = `
+                  <span class="pos-tag">${slotLabel}</span>
+                  <span class="name-group"><span class="player-name">${escapeHtml(p.player_name || '—')}</span>${teamBit}</span>
+                  <span class="pts">${pts > 0 ? pts.toFixed(2) + ' pts' : '—'}</span>`;
+              }
+
               col.appendChild(row);
             });
           }
+
           grid.appendChild(col);
         });
+
         container.appendChild(grid);
       }
+
       async function toggleDetail(mainTr, btn, team) {
         const detailTr = mainTr.nextElementSibling;
         const expanded = btn.getAttribute('aria-expanded') === 'true';
@@ -388,6 +391,7 @@
         renderDetailGrid(container, byRound, positionPlaceholders);
       }
 
+      // Load leaderboard
       const { data: rows, error } = await sb
         .from('v_od_leaderboard_visible_api')
         .select('team_id, team_name, total_points')
@@ -432,7 +436,6 @@
         tbody.appendChild(dtr);
       });
 
-      // Simple keyboard helpers
       let selected = null;
       function clearSel(){ if(selected){ selected.classList.remove('is-selected'); selected=null; } }
       function selectRow(tr){ if(selected===tr){ clearSel(); return; } clearSel(); selected=tr; selected.classList.add('is-selected'); }

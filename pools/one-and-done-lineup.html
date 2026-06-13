@@ -459,22 +459,36 @@ function getPlayerStatus(player, currentSlot) {
     }
 
     // ── Save lineup ──────────────────────────────────────────
+ // ── Save lineup ──────────────────────────────────────────
     async function saveLineup() {
       const saveBtn = document.getElementById('save-btn');
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
       try {
-        // Build rows to upsert
+        // ── Read the current round from system_settings ──
+        let currentRound = 'Offseason';
+        try {
+          const { data: roundRow } = await sb
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'current_round_label')
+            .maybeSingle();
+          if (roundRow?.value) currentRound = roundRow.value;
+        } catch (e) {
+          console.warn('Could not read current round, defaulting to Offseason', e);
+        }
+
+        // Build rows to insert, stamped with the current round
         const rows = [];
         POSITIONS.forEach(slot => {
           const qty = rosterSettings[slot] || 1;
           if (qty > 1) {
             (picks[slot] || []).forEach(pid => {
-              rows.push({ team_id: teamId, slot, player_id: pid });
+              rows.push({ team_id: teamId, slot, player_id: pid, round_label: currentRound });
             });
           } else if (picks[slot]) {
-            rows.push({ team_id: teamId, slot, player_id: picks[slot] });
+            rows.push({ team_id: teamId, slot, player_id: picks[slot], round_label: currentRound });
           }
         });
 
@@ -483,12 +497,13 @@ function getPlayerStatus(player, currentSlot) {
           return;
         }
 
-        // Delete existing picks for unlocked slots, then insert fresh
+        // Delete only THIS round's existing picks for this team, then insert fresh.
+        // Picks from previous rounds stay locked in.
         const { error: delErr } = await sb
           .from('one_and_done_picks')
           .delete()
           .eq('team_id', teamId)
-          .is('window_id', null);
+          .eq('round_label', currentRound);
 
         if (delErr) throw delErr;
 
@@ -497,6 +512,26 @@ function getPlayerStatus(player, currentSlot) {
           .insert(rows);
 
         if (insErr) throw insErr;
+
+        // Send confirmation email
+        try {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session) {
+            await fetch(`${window.SUPABASE_URL}/functions/v1/send-pick-confirmation`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                entry_id: teamId,
+                window_id: null
+              })
+            });
+          }
+        } catch(e) {
+          console.warn('Email send failed:', e);
+        }
 
         alert('✅ Lineup saved!');
       } catch(e) {
