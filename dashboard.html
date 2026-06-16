@@ -61,7 +61,7 @@
 
     <!-- Subtle buttons; Admin hidden by default -->
     <div class="actions" style="display:flex; gap:8px; align-items:center;">
-      <a class="btn btn--quiet" href="admin/admin.html" id="admin-link" hidden>Admin Home</a>
+      <a class="btn btn--quiet" href="admin/admin.html" id="admin-link" style="display:none">Admin Home</a>
       <button class="btn btn--quiet" id="logout-btn">Logout</button>
     </div>
   </header>
@@ -118,7 +118,7 @@
       const prof = await getProfile();
       if (prof && prof.is_admin) {
         const adminLink = document.getElementById('admin-link');
-        if (adminLink) adminLink.hidden = false;
+       if (adminLink) adminLink.style.display = 'inline-flex';
       }
 
       // Logout

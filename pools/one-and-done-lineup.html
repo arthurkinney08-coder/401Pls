@@ -385,15 +385,26 @@
         if (!picks[slot]) picks[slot] = [];
         const idx = picks[slot].indexOf(playerId);
         if (idx >= 0) {
+          // clicking an already-picked (unlocked) player removes it
           picks[slot].splice(idx, 1);
         } else {
-          // count open (non-locked) capacity
-          if (picks[slot].length >= qty) {
-            showToast(`${slot} is full (${qty}).`);
-            return;
-          }
           if (isPickedAnywhere(playerId) && !isPickedInSlot(playerId, slot)) return;
-          picks[slot].push(playerId);
+
+          if (picks[slot].length >= qty) {
+            // Slot is full → swap out the OLDEST UNLOCKED pick to make room.
+            // Locked picks are never bumped.
+            const oldestUnlockedIdx = picks[slot].findIndex(id => !lockedPickIds.has(id));
+            if (oldestUnlockedIdx === -1) {
+              // every seat is locked — nothing can be swapped
+              showToast(`${slot} is locked — all picks' games have started.`);
+              return;
+            }
+            picks[slot].splice(oldestUnlockedIdx, 1); // remove oldest unlocked
+            picks[slot].push(playerId);               // add the new pick
+          } else {
+            // open seat available
+            picks[slot].push(playerId);
+          }
         }
       } else {
         if (picks[slot] === playerId) {
@@ -502,7 +513,7 @@
     // ── Render picks chips ───────────────────────────────────
     function renderPicksBar() {
       const chips = document.getElementById('picks-chips');
-      const noMsg = document.getElementById('no-picks-msg');
+      if (!chips) return;
       chips.innerHTML = '';
 
       let hasAny = false;
@@ -525,7 +536,14 @@
         else if (picks[slot]) addChip(slot, picks[slot]);
       });
 
-      noMsg.hidden = hasAny;
+      // If nothing picked, show the placeholder message (rebuilt fresh, since innerHTML was cleared)
+      if (!hasAny) {
+        const msg = document.createElement('span');
+        msg.className = 'muted';
+        msg.id = 'no-picks-msg';
+        msg.textContent = 'No picks yet — select players below';
+        chips.appendChild(msg);
+      }
 
       chips.querySelectorAll('.remove').forEach(btn => {
         btn.addEventListener('click', (e) => {
