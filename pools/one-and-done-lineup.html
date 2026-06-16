@@ -23,6 +23,7 @@
       border-radius: 12px;
       overflow: hidden;
     }
+    .slot-card.slot-locked { border-color: rgba(239,68,68,0.35); }
     .slot-header {
       display: flex;
       justify-content: space-between;
@@ -31,6 +32,7 @@
       background: rgba(255,255,255,0.03);
       border-bottom: 1px solid var(--border);
     }
+    .slot-card.slot-locked .slot-header { background: rgba(239,68,68,0.08); }
     .slot-title {
       font-weight: 700;
       font-size: 1rem;
@@ -40,10 +42,18 @@
       font-size: .85rem;
       color: var(--muted);
     }
+    .slot-count.locked-tag { color: #ef4444; font-weight: 700; }
     .slot-body {
       max-height: 280px;
       overflow-y: auto;
       padding: 6px 0;
+    }
+    .slot-locked-banner {
+      padding: 14px;
+      text-align: center;
+      color: #ef4444;
+      font-weight: 600;
+      font-size: .9rem;
     }
     .player-row {
       display: flex;
@@ -96,7 +106,13 @@
       padding: 5px 10px;
       font-size: .85rem;
     }
+    .pick-chip.locked-chip {
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.35);
+    }
     .pick-chip .pos { font-weight: 700; color: #3b82f6; }
+    .pick-chip.locked-chip .pos { color: #ef4444; }
+    .pick-chip .lock-icon { font-size: .85rem; }
     .pick-chip .remove {
       cursor: pointer;
       color: var(--muted);
@@ -112,12 +128,21 @@
       justify-content: flex-end;
       gap: 10px;
       margin-top: 16px;
+      align-items: center;
     }
     .search-bar {
       width: 100%;
       margin-bottom: 12px;
     }
     .missing-msg { color: var(--warning); font-size: .9rem; margin-top: 6px; }
+    .inline-toast {
+      color: #ef4444;
+      font-size: .85rem;
+      margin-right: auto;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .inline-toast.show { opacity: 1; }
   </style>
 </head>
 <body class="theme-dark">
@@ -155,6 +180,7 @@
 
     <!-- Save -->
     <div class="save-row">
+      <span class="inline-toast" id="inline-toast"></span>
       <button class="btn btn--ghost btn--sm" id="save-btn">Save Lineup</button>
     </div>
   </main>
@@ -191,10 +217,27 @@
     const now = new Date();
 
     // ── State ───────────────────────────────────────────────
-    let picks = {}; // { QB: playerId, RB: [id1, id2], ... }
-    let players = []; // all players from DB
-    let usedPlayerIds = new Set(); // used in past started rounds
+    let picks = {};               // { QB: playerId, RB: [id1, id2], ... }
+    let players = [];             // all players from DB
+    let playerById = new Map();   // quick lookup
+    let lockedPickIds = new Set();// player_ids whose game already started AND are picked → cannot remove
     let rosterSettings = { QB:1, RB:2, WR:2, TE:1, FLEX:1, K:1, DST:1 };
+
+    // ── Helpers ─────────────────────────────────────────────
+    function gameHasStarted(player) {
+      if (!player) return false;
+      const gs = player.game_start_utc ? new Date(player.game_start_utc) : null;
+      return !!(gs && gs <= now);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('inline-toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => t.classList.remove('show'), 2600);
+    }
 
     // ── Load roster settings ────────────────────────────────
     try {
@@ -215,71 +258,71 @@
 
     if (playerErr) { alert('Failed to load players'); return; }
     players = playerData || [];
+    playerById = new Map(players.map(p => [p.id, p]));
 
-    // ── Load used players (picks from past started games) ───
+    // ── Load existing picks for this team (current round) ───
+    // IMPORTANT: we keep ALL picks in state — including started ones —
+    // so that started picks stay visible, locked, and survive a save.
     try {
-      const { data: pastPicks } = await sb
-        .from('one_and_done_picks')
-        .select('player_id, players(game_start_utc)')
-        .eq('team_id', teamId);
+      // figure out current round first
+      let currentRound = 'Offseason';
+      try {
+        const { data: roundRow } = await sb
+          .from('system_settings').select('value')
+          .eq('key', 'current_round_label').maybeSingle();
+        if (roundRow?.value) currentRound = roundRow.value;
+      } catch(_) {}
 
-      (pastPicks || []).forEach(pick => {
-        const gameStart = pick.players?.game_start_utc;
-        if (gameStart && new Date(gameStart) <= now) {
-          usedPlayerIds.add(pick.player_id);
-        }
-      });
-    } catch(e) { console.warn('used players error', e); }
-
-    // ── Load existing picks for this team ───────────────────
-    try {
       const { data: existingPicks } = await sb
         .from('one_and_done_picks')
-        .select('slot, player_id, players(game_start_utc)')
-        .eq('team_id', teamId);
+        .select('slot, player_id, round_label, players(game_start_utc)')
+        .eq('team_id', teamId)
+        .eq('round_label', currentRound);
 
       (existingPicks || []).forEach(pick => {
-        const gameStart = pick.players?.game_start_utc;
-        const isStarted = gameStart && new Date(gameStart) <= now;
-        // Only restore picks for games that haven't started yet
-        if (!isStarted) {
-          const slot = pick.slot;
-          const qty = rosterSettings[slot] || 1;
-          if (qty > 1) {
-            if (!picks[slot]) picks[slot] = [];
-            picks[slot].push(pick.player_id);
-          } else {
-            picks[slot] = pick.player_id;
-          }
+        const slot = pick.slot;
+        const qty = rosterSettings[slot] || 1;
+        if (qty > 1) {
+          if (!picks[slot]) picks[slot] = [];
+          picks[slot].push(pick.player_id);
+        } else {
+          picks[slot] = pick.player_id;
         }
+        // mark as locked if its game already started
+        const gs = pick.players?.game_start_utc;
+        if (gs && new Date(gs) <= now) lockedPickIds.add(pick.player_id);
       });
     } catch(e) { console.warn('existing picks error', e); }
 
-    // ── Player status ────────────────────────────────────────
-function getPlayerStatus(player, currentSlot) {
-  if (!player) return { status: 'eligible', label: 'Eligible' };
-  const gameStart = player.game_start_utc ? new Date(player.game_start_utc) : null;
-  if (gameStart && gameStart <= now) return { status: 'locked', label: 'Locked' };
-  if (usedPlayerIds.has(player.id)) return { status: 'used', label: 'Used' };
-  
-  // Check if picked in another slot
-  for (const slot of POSITIONS) {
-    if (slot === currentSlot) continue;
-    const qty = rosterSettings[slot] || 1;
-    const inSlot = qty > 1 
-      ? (picks[slot] || []).includes(player.id)
-      : picks[slot] === player.id;
-    if (inSlot) return { status: 'in-slot', label: `In ${slot}` };
-  }
-  
-  return { status: 'eligible', label: 'Eligible' };
-}
+    // ── Status of a player relative to a slot ───────────────
+    function getPlayerStatus(player, currentSlot) {
+      if (!player) return { status: 'eligible', label: 'Eligible' };
+
+      const isPicked = isPickedInSlot(player.id, currentSlot);
+
+      // A picked player whose game started = locked-in (stays, can't remove)
+      if (isPicked && lockedPickIds.has(player.id)) return { status: 'locked', label: 'Locked' };
+
+      // An UNPICKED player whose game started = unselectable
+      if (!isPicked && gameHasStarted(player)) return { status: 'started', label: 'Game started' };
+
+      // Picked in a different slot
+      for (const slot of POSITIONS) {
+        if (slot === currentSlot) continue;
+        const qty = rosterSettings[slot] || 1;
+        const inSlot = qty > 1
+          ? (picks[slot] || []).includes(player.id)
+          : picks[slot] === player.id;
+        if (inSlot) return { status: 'in-slot', label: `In ${slot}` };
+      }
+
+      if (isPicked) return { status: 'selected', label: 'Selected' };
+      return { status: 'eligible', label: 'Eligible' };
+    }
 
     function isPickedInSlot(playerId, slot) {
       const qty = rosterSettings[slot] || 1;
-      if (qty > 1) {
-        return (picks[slot] || []).includes(playerId);
-      }
+      if (qty > 1) return (picks[slot] || []).includes(playerId);
       return picks[slot] === playerId;
     }
 
@@ -289,6 +332,20 @@ function getPlayerStatus(player, currentSlot) {
         if (qty > 1) return (picks[slot] || []).includes(playerId);
         return picks[slot] === playerId;
       });
+    }
+
+    // How many seats in a slot are filled by locked (started) players
+    function lockedCountInSlot(slot) {
+      const qty = rosterSettings[slot] || 1;
+      if (qty > 1) return (picks[slot] || []).filter(id => lockedPickIds.has(id)).length;
+      return (picks[slot] && lockedPickIds.has(picks[slot])) ? 1 : 0;
+    }
+
+    // Is the whole slot locked? (all seats filled AND all filled with started players)
+    function isSlotFullyLocked(slot) {
+      const qty = rosterSettings[slot] || 1;
+      const filled = qty > 1 ? (picks[slot] || []).length : (picks[slot] ? 1 : 0);
+      return filled >= qty && lockedCountInSlot(slot) >= qty;
     }
 
     // ── Get players for a slot ───────────────────────────────
@@ -307,10 +364,21 @@ function getPlayerStatus(player, currentSlot) {
       return filtered;
     }
 
-    // ── Pick a player ────────────────────────────────────────
+    // ── Pick / unpick a player ───────────────────────────────
     function togglePick(playerId, slot) {
-      const status = getPlayerStatus(players.find(p => p.id === playerId));
-      if (status === 'locked' || status === 'used') return;
+      const player = playerById.get(playerId);
+      const isPicked = isPickedInSlot(playerId, slot);
+
+      // Can't touch a locked pick (its game started)
+      if (isPicked && lockedPickIds.has(playerId)) {
+        showToast('That game has already started — pick is locked.');
+        return;
+      }
+      // Can't select an unpicked player whose game started
+      if (!isPicked && gameHasStarted(player)) {
+        showToast('That game has already started — cannot pick.');
+        return;
+      }
 
       const qty = rosterSettings[slot] || 1;
       if (qty > 1) {
@@ -318,8 +386,12 @@ function getPlayerStatus(player, currentSlot) {
         const idx = picks[slot].indexOf(playerId);
         if (idx >= 0) {
           picks[slot].splice(idx, 1);
-        } else if (picks[slot].length < qty) {
-          // Check not used in another slot
+        } else {
+          // count open (non-locked) capacity
+          if (picks[slot].length >= qty) {
+            showToast(`${slot} is full (${qty}).`);
+            return;
+          }
           if (isPickedAnywhere(playerId) && !isPickedInSlot(playerId, slot)) return;
           picks[slot].push(playerId);
         }
@@ -327,6 +399,11 @@ function getPlayerStatus(player, currentSlot) {
         if (picks[slot] === playerId) {
           delete picks[slot];
         } else {
+          // single slot: if current pick is locked, refuse
+          if (picks[slot] && lockedPickIds.has(picks[slot])) {
+            showToast('That game has already started — slot is locked.');
+            return;
+          }
           if (isPickedAnywhere(playerId)) return;
           picks[slot] = playerId;
         }
@@ -338,12 +415,11 @@ function getPlayerStatus(player, currentSlot) {
     function renderSlotCard(slot) {
       const qty = rosterSettings[slot] || 1;
       const slotPlayers = getPlayersForSlot(slot);
-      const selectedCount = qty > 1
-        ? (picks[slot] || []).length
-        : (picks[slot] ? 1 : 0);
+      const selectedCount = qty > 1 ? (picks[slot] || []).length : (picks[slot] ? 1 : 0);
+      const fullyLocked = isSlotFullyLocked(slot);
 
       const card = document.createElement('div');
-      card.className = 'slot-card';
+      card.className = 'slot-card' + (fullyLocked ? ' slot-locked' : '');
       card.dataset.slot = slot;
 
       // Header
@@ -351,11 +427,24 @@ function getPlayerStatus(player, currentSlot) {
       header.className = 'slot-header';
       header.innerHTML = `
         <span class="slot-title">${slot}</span>
-        <span class="slot-count">Selected ${selectedCount} of ${qty}</span>
+        <span class="slot-count ${fullyLocked ? 'locked-tag' : ''}">
+          ${fullyLocked ? '🔒 Game started' : `Selected ${selectedCount} of ${qty}`}
+        </span>
       `;
       card.appendChild(header);
 
-      // Body
+      // If fully locked, show a banner instead of the player list
+      if (fullyLocked) {
+        const banner = document.createElement('div');
+        banner.className = 'slot-locked-banner';
+        const names = (qty > 1 ? (picks[slot] || []) : [picks[slot]])
+          .map(id => playerById.get(id)?.full_name).filter(Boolean).join(', ');
+        banner.innerHTML = `🔒 Locked — game started<br><span class="muted" style="font-weight:400">${names}</span>`;
+        card.appendChild(banner);
+        return card;
+      }
+
+      // Body (normal)
       const body = document.createElement('div');
       body.className = 'slot-body';
 
@@ -365,17 +454,18 @@ function getPlayerStatus(player, currentSlot) {
         slotPlayers.forEach(player => {
           const { status, label } = getPlayerStatus(player, slot);
           const isPicked = isPickedInSlot(player.id, slot);
+          const isLockedPick = isPicked && lockedPickIds.has(player.id);
+          const isStartedUnpicked = !isPicked && status === 'started';
 
           const row = document.createElement('div');
-          row.className = `player-row${isPicked ? ' selected' : ''}${status === 'locked' ? ' locked' : ''}${status === 'used' ? ' used' : ''}`;
+          row.className = `player-row${isPicked ? ' selected' : ''}${(isLockedPick || isStartedUnpicked) ? ' locked' : ''}`;
 
-       let badgeClass = 'badge-eligible';
-      let badgeText = label;
-      if (isPicked) { badgeClass = 'badge-selected'; badgeText = 'Selected'; }
-      else if (status === 'locked') { badgeClass = 'badge-locked'; }
-      else if (status === 'used') { badgeClass = 'badge-used'; }
-      else if (status === 'in-slot') { badgeClass = 'badge-used'; }
-
+          let badgeClass = 'badge-eligible';
+          let badgeText = label;
+          if (isLockedPick) { badgeClass = 'badge-locked'; badgeText = 'Locked'; }
+          else if (isStartedUnpicked) { badgeClass = 'badge-locked'; badgeText = 'Game started'; }
+          else if (isPicked) { badgeClass = 'badge-selected'; badgeText = 'Selected'; }
+          else if (status === 'in-slot') { badgeClass = 'badge-used'; }
 
           row.innerHTML = `
             <div class="player-info">
@@ -385,8 +475,20 @@ function getPlayerStatus(player, currentSlot) {
             <span class="status-badge ${badgeClass}">${badgeText}</span>
           `;
 
-          if ((status === 'eligible' || isPicked) && status !== 'in-slot') {
+          // Clickable only if: eligible, OR a selected-but-not-locked pick (to allow unpick), OR full slot toggle
+          const clickable =
+            status === 'eligible' ||
+            (isPicked && !isLockedPick);
+
+          if (clickable) {
+            row.style.cursor = 'pointer';
             row.addEventListener('click', () => togglePick(player.id, slot));
+          } else {
+            row.style.cursor = 'not-allowed';
+            // still allow a click to show the toast for started players
+            if (isStartedUnpicked || isLockedPick) {
+              row.addEventListener('click', () => togglePick(player.id, slot));
+            }
           }
 
           body.appendChild(row);
@@ -404,43 +506,36 @@ function getPlayerStatus(player, currentSlot) {
       chips.innerHTML = '';
 
       let hasAny = false;
+      const addChip = (slot, pid) => {
+        const p = playerById.get(pid);
+        if (!p) return;
+        hasAny = true;
+        const locked = lockedPickIds.has(pid);
+        const chip = document.createElement('span');
+        chip.className = 'pick-chip' + (locked ? ' locked-chip' : '');
+        chip.innerHTML = locked
+          ? `<span class="pos">${slot}</span> ${p.full_name} <span class="lock-icon">🔒</span>`
+          : `<span class="pos">${slot}</span> ${p.full_name} <button class="remove" data-slot="${slot}" data-pid="${pid}">×</button>`;
+        chips.appendChild(chip);
+      };
+
       POSITIONS.forEach(slot => {
         const qty = rosterSettings[slot] || 1;
-        if (qty > 1) {
-          (picks[slot] || []).forEach(pid => {
-            const p = players.find(x => x.id === pid);
-            if (!p) return;
-            hasAny = true;
-            const chip = document.createElement('span');
-            chip.className = 'pick-chip';
-            chip.innerHTML = `<span class="pos">${slot}</span> ${p.full_name} <button class="remove" data-slot="${slot}" data-pid="${pid}">×</button>`;
-            chips.appendChild(chip);
-          });
-        } else if (picks[slot]) {
-          const p = players.find(x => x.id === picks[slot]);
-          if (!p) return;
-          hasAny = true;
-          const chip = document.createElement('span');
-          chip.className = 'pick-chip';
-          chip.innerHTML = `<span class="pos">${slot}</span> ${p.full_name} <button class="remove" data-slot="${slot}" data-pid="${picks[slot]}">×</button>`;
-          chips.appendChild(chip);
-        }
+        if (qty > 1) (picks[slot] || []).forEach(pid => addChip(slot, pid));
+        else if (picks[slot]) addChip(slot, picks[slot]);
       });
 
       noMsg.hidden = hasAny;
 
-      // Wire remove buttons
       chips.querySelectorAll('.remove').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const slot = btn.dataset.slot;
           const pid = btn.dataset.pid;
+          if (lockedPickIds.has(pid)) { showToast('That pick is locked.'); return; }
           const qty = rosterSettings[slot] || 1;
-          if (qty > 1) {
-            picks[slot] = (picks[slot] || []).filter(id => id !== pid);
-          } else {
-            delete picks[slot];
-          }
+          if (qty > 1) picks[slot] = (picks[slot] || []).filter(id => id !== pid);
+          else delete picks[slot];
           renderAll();
         });
       });
@@ -451,42 +546,33 @@ function getPlayerStatus(player, currentSlot) {
       const grid = document.getElementById('lineup-grid');
       grid.innerHTML = '';
       POSITIONS.forEach(slot => {
-        if ((rosterSettings[slot] || 0) > 0) {
-          grid.appendChild(renderSlotCard(slot));
-        }
+        if ((rosterSettings[slot] || 0) > 0) grid.appendChild(renderSlotCard(slot));
       });
       renderPicksBar();
     }
 
     // ── Save lineup ──────────────────────────────────────────
- // ── Save lineup ──────────────────────────────────────────
     async function saveLineup() {
       const saveBtn = document.getElementById('save-btn');
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
       try {
-        // ── Read the current round from system_settings ──
+        // current round
         let currentRound = 'Offseason';
         try {
           const { data: roundRow } = await sb
-            .from('system_settings')
-            .select('value')
-            .eq('key', 'current_round_label')
-            .maybeSingle();
+            .from('system_settings').select('value')
+            .eq('key', 'current_round_label').maybeSingle();
           if (roundRow?.value) currentRound = roundRow.value;
-        } catch (e) {
-          console.warn('Could not read current round, defaulting to Offseason', e);
-        }
+        } catch (e) { console.warn('round read failed', e); }
 
-        // Build rows to insert, stamped with the current round
+        // Build rows from current state (includes locked picks so they persist)
         const rows = [];
         POSITIONS.forEach(slot => {
           const qty = rosterSettings[slot] || 1;
           if (qty > 1) {
-            (picks[slot] || []).forEach(pid => {
-              rows.push({ team_id: teamId, slot, player_id: pid, round_label: currentRound });
-            });
+            (picks[slot] || []).forEach(pid => rows.push({ team_id: teamId, slot, player_id: pid, round_label: currentRound }));
           } else if (picks[slot]) {
             rows.push({ team_id: teamId, slot, player_id: picks[slot], round_label: currentRound });
           }
@@ -497,21 +583,25 @@ function getPlayerStatus(player, currentSlot) {
           return;
         }
 
-        // Delete only THIS round's existing picks for this team, then insert fresh.
-        // Picks from previous rounds stay locked in.
-        const { error: delErr } = await sb
-          .from('one_and_done_picks')
+        // Delete ONLY the unlocked picks for this round, leaving started/locked ones untouched.
+        const lockedIds = Array.from(lockedPickIds);
+        let delQuery = sb.from('one_and_done_picks')
           .delete()
           .eq('team_id', teamId)
           .eq('round_label', currentRound);
-
+        if (lockedIds.length) {
+          // don't delete the locked ones
+          delQuery = delQuery.not('player_id', 'in', `(${lockedIds.join(',')})`);
+        }
+        const { error: delErr } = await delQuery;
         if (delErr) throw delErr;
 
-        const { error: insErr } = await sb
-          .from('one_and_done_picks')
-          .insert(rows);
-
-        if (insErr) throw insErr;
+        // Insert only the NON-locked rows (locked ones already exist in DB and weren't deleted)
+        const rowsToInsert = rows.filter(r => !lockedPickIds.has(r.player_id));
+        if (rowsToInsert.length) {
+          const { error: insErr } = await sb.from('one_and_done_picks').insert(rowsToInsert);
+          if (insErr) throw insErr;
+        }
 
         // Send confirmation email
         try {
@@ -519,19 +609,11 @@ function getPlayerStatus(player, currentSlot) {
           if (session) {
             await fetch(`${window.SUPABASE_URL}/functions/v1/send-pick-confirmation`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              body: JSON.stringify({
-                entry_id: teamId,
-                window_id: null
-              })
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+              body: JSON.stringify({ entry_id: teamId, window_id: null })
             });
           }
-        } catch(e) {
-          console.warn('Email send failed:', e);
-        }
+        } catch(e) { console.warn('Email send failed:', e); }
 
         alert('✅ Lineup saved!');
       } catch(e) {
@@ -546,7 +628,18 @@ function getPlayerStatus(player, currentSlot) {
     // ── Wire up ──────────────────────────────────────────────
     document.getElementById('save-btn').addEventListener('click', saveLineup);
     document.getElementById('clear-all-btn').addEventListener('click', () => {
-      picks = {};
+      // Clear All keeps locked picks (can't remove those)
+      const kept = {};
+      POSITIONS.forEach(slot => {
+        const qty = rosterSettings[slot] || 1;
+        if (qty > 1) {
+          const lockedInSlot = (picks[slot] || []).filter(id => lockedPickIds.has(id));
+          if (lockedInSlot.length) kept[slot] = lockedInSlot;
+        } else if (picks[slot] && lockedPickIds.has(picks[slot])) {
+          kept[slot] = picks[slot];
+        }
+      });
+      picks = kept;
       renderAll();
     });
     document.getElementById('player-search').addEventListener('input', renderAll);
